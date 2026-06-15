@@ -1,0 +1,10 @@
+---
+services:
+  redis:
+    image: redis:latest
+    container_name: my-redis
+    volumes:
+      - redis-data:/data
+    environment:
+      - REDIS_ARGS=--appendonly yes
+    restart: unless-stopped

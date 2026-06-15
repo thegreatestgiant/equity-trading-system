@@ -1,0 +1,17 @@
+---
+services:
+  db-dev:
+    image: postgres:17
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${NAME}
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8081:8080

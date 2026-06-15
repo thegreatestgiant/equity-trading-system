@@ -1,2 +1,3 @@
 include:
-  - /path/to/compose.yml
+  - backend/DB/compose.yml
+  - backend/PubSub/compose.yml
