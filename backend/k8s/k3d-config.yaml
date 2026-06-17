@@ -16,3 +16,15 @@ options:
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
+files:
+  - description: "1. Create Namespaces"
+    source: ./manifests/00-namespaces.yaml
+    destination: /var/lib/rancher/k3s/server/manifests/00-namespaces.yaml
+    nodeFilters:
+      - "server:*"
+
+  - description: "2. Deploy Backend App"
+    source: ./manifests/01-booklib.yaml
+    destination: /var/lib/rancher/k3s/server/manifests/01-booklib.yaml
+    nodeFilters:
+      - "server:*"

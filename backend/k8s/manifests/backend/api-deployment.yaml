@@ -1,0 +1,21 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booklib-api
+  namespace: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: booklib
+  template:
+    metadata:
+      labels:
+        app: booklib
+    spec:
+      containers:
+        - name: fastapi
+          image: thegreatestgiant/book_lib:latest
+          ports:
+            - containerPort: 8080 # The port the container listens on internally

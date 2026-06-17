@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booklib-api
+  namespace: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: booklib
+  template:
+    metadata:
+      labels:
+        app: booklib
+    spec:
+      containers:
+        - name: fastapi
+          image: thegreatestgiant/book_lib:latest
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booklib-service
+  namespace: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: booklib
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: booklib-ingress
+  namespace: backend
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: booklib-service
+                port:
+                  number: 80

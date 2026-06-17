@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booklib-service
+  namespace: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: booklib
+  ports:
+    - port: 80 # The port the service listens on
+      targetPort: 8080 # The port it sends traffic to on the container
