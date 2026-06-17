@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Response, HTTPException, Cookie, Depends
-from redis import Redis
+from redis.asyncio import Redis
 import jwt
 import uuid
 import json
+import time
+import msgpack
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 
@@ -41,6 +43,7 @@ def create_cookie(username: str):
 
 # Initialize Redis client
 redis_client = Redis(host=redis_host, port=redis_port_number, db=0)
+async_redis_client = Redis(host=redis_host, port=redis_port_number, db=0)
 
 
 # Login details
@@ -321,3 +324,90 @@ def get_accounts_positions_for_ticker(
 
 
 # endregion
+
+#Trades
+#region
+@app.post("/trade")
+async def create_trade(trade: dict, username: str = Depends(verify_cookie)):
+
+    # Check ticker exists
+    raw_ticker = await async_redis_client.hget(redis_dictionaries[2], trade["ticker"])
+    if not raw_ticker:
+        raise HTTPException(status_code=404, detail="This ticker does not exist")
+
+    raw_user = await async_redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    # Confirm you have access to this account
+    if trade["account_id"] not in user_data["accounts"]:
+        raise HTTPException(
+            status_code=401, detail="You do not have access to this account"
+        )
+    elif trade["user_id"] != username:
+        raise HTTPException(status_code=404, detail="This user does not match your username")
+    elif trade["direction"] not in ("Buy", "Sell"):
+        raise HTTPException(status_code=422, detail="Not a valid Direction")
+    
+    
+    raw_account = await async_redis_client.hget(redis_dictionaries[1], trade["account_id"])
+    account_data = json.loads(raw_account)
+
+    raw_positions = await async_redis_client.hgetall(redis_dictionaries[3])
+    position_key = None
+    new_position = None
+
+    for key, x in raw_positions.items():
+        x_positions = json.loads(x)
+        if (
+            x_positions["Account_id"] == trade["account_id"] and x_positions["Ticker"] == trade["ticker"]
+        ):  # Correct account and ticker
+            position_key = key.decode() if isinstance(key, bytes) else key
+            if x_positions["Quantity"]-trade["quantity"] < 0 and not account_data["can_short"]:
+                raise HTTPException(status_code=403, detail="You do not have permission to short")
+            new_position = x_positions["Quantity"]+trade["quantity"] if trade["direction"] == "Buy" else x_positions["Quantity"]-trade["quantity"]
+            
+            break  # only one account and one ticker
+
+    payload = {
+        "trade_id": str(uuid.uuid4()),
+        "account_id": trade["account_id"],
+        "user_id": trade["user_id"],
+        "direction": trade["direction"],  # Must be exact string: 'Buy' or 'Sell'
+        "ticker": trade["ticker"],
+        "created_at": int(time.time()),   # Unix timestamps for lightning-fast serializing
+        "updated_at": int(time.time()),
+        "quantity": int(trade["quantity"]),
+        "price": str(trade["price"]),     # Kept as string for Postgres NUMERIC ingestion
+        "other_account": trade.get("other_account") # Can be None/Null
+    }
+    
+    # Pack to raw binary
+    packed_bytes = msgpack.packb(payload)
+    
+    # High Efficiency: Save to a single field named "d"
+    await async_redis_client.xadd("trade_stream", {"d": packed_bytes})
+    
+    now = datetime.now(timezone.utc).isoformat()
+
+    if position_key is None:
+        position_key = len(raw_positions.keys())
+        position_data = {
+            "Account_id": trade["account_id"],
+            "Ticker": trade["ticker"],
+            "Quantity": new_position,
+            "Created_at": now,
+            "Updated_at": now
+        }
+        await async_redis_client.hset(redis_dictionaries[3], position_key, json.dumps(position_data))
+    else:
+        raw_specific_position = await async_redis_client.hget(redis_dictionaries[3], position_key)
+        specific_position = json.loads(raw_specific_position)
+
+        specific_position["Quantity"] = new_position
+        specific_position["Updated_at"] = now
+        await async_redis_client.hset(redis_dictionaries[3], position_key, json.dumps(specific_position))
+    
+
+    return {"status": "success"}
+
+#endregion
