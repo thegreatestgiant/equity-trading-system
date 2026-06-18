@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Response, HTTPException, Cookie, Depends
-from redis import Redis as SyncRedis
 from redis.asyncio import Redis as AsyncRedis
 import jwt
 import uuid
@@ -44,8 +43,7 @@ def create_cookie(username: str):
 
 
 # Initialize Redis client
-redis_client = SyncRedis(host=redis_host, port=redis_port_number, db=0)
-async_redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
+redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
 
 
 # Login details
@@ -60,13 +58,13 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/register")
-def register_user(request: RegisterRequest, response: Response):
+async def register_user(request: RegisterRequest, response: Response):
 
     username = request.username
     password = request.password
 
     # Check if the username already exists in Redis
-    if redis_client.hexists(redis_dictionaries[0], username):
+    if await redis_client.hexists(redis_dictionaries[0], username):
         raise HTTPException(status_code=409, detail="Username already exists")
 
     # Create new User data
@@ -82,7 +80,7 @@ def register_user(request: RegisterRequest, response: Response):
     }
 
     # send new User to redis
-    redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
+    await redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
 
     # Create token for authentication
     authentication_cookie = create_cookie(username)
@@ -97,14 +95,14 @@ def register_user(request: RegisterRequest, response: Response):
     return {"message": "User registered successfully."}
 
 
-@app.get("/login")
-def login_user(request: LoginRequest, response: Response):
+@app.post("/login")
+async def login_user(request: LoginRequest, response: Response):
 
     username = request.username
     password = request.password
 
     # Get the User data from redis
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     if not raw_user:  # No such user exists
         raise HTTPException(status_code=401, detail="Wrong Username or Password")
 
@@ -126,7 +124,7 @@ def login_user(request: LoginRequest, response: Response):
 
 
 @app.post("/logout")
-def logout(response: Response):
+async def logout(response: Response):
 
     response.delete_cookie(key="session", httponly=True, samesite="lax")
 
@@ -136,7 +134,7 @@ def logout(response: Response):
 # endregion
 
 
-def verify_cookie(session: str = Cookie(None)):
+async def verify_cookie(session: str = Cookie(None)):
     if not session:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -155,7 +153,7 @@ def verify_cookie(session: str = Cookie(None)):
 # Account details
 # region
 @app.post("/users/account")
-def create_account(can_short: bool, username: str = Depends(verify_cookie)):
+async def create_account(can_short: bool, username: str = Depends(verify_cookie)):
 
     # Create account
     account_id = str(uuid.uuid4())
@@ -168,35 +166,35 @@ def create_account(can_short: bool, username: str = Depends(verify_cookie)):
         "updated_at": now,
     }
 
-    redis_client.hset(redis_dictionaries[1], account_id, json.dumps(account_data))
+    await redis_client.hset(redis_dictionaries[1], account_id, json.dumps(account_data))
 
     # Grab User to add Account to them
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     user_data["accounts"].append(account_id)
     user_data["updated_at"] = now
 
-    redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
+    await redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
 
     return {"message": "Account created"}
 
 
 @app.post("/users/accounts/{account_id}")
-def add_account(account_id: str, username: str = Depends(verify_cookie)):
+async def add_account(account_id: str, username: str = Depends(verify_cookie)):
 
-    raw_account = redis_client.hget(redis_dictionaries[1], account_id)
+    raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
     if not raw_account:
         raise HTTPException(status_code=404, detail="This account does not exist")
 
     # Grab User to add account to them
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     user_data["accounts"].append(account_id)
     user_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
+    await redis_client.hset(redis_dictionaries[0], username, json.dumps(user_data))
 
     return {"message": f"Account added to user {username}"}
 
@@ -207,14 +205,14 @@ def add_account(account_id: str, username: str = Depends(verify_cookie)):
 # Positions
 # region
 @app.get("/positions")
-def get_users_positions(username: str = Depends(verify_cookie)):
+async def get_users_positions(username: str = Depends(verify_cookie)):
 
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     positions = {}
 
-    raw_positions = redis_client.hgetall(redis_dictionaries[3])
+    raw_positions = await redis_client.hgetall(redis_dictionaries[3])
 
     for x in raw_positions.values():
         x_positions = json.loads(x)
@@ -246,9 +244,9 @@ def get_users_positions(username: str = Depends(verify_cookie)):
 
 
 @app.get("/positions/accounts/{account_id}")
-def get_accounts_positions(account_id: str, username: str = Depends(verify_cookie)):
+async def get_accounts_positions(account_id: str, username: str = Depends(verify_cookie)):
 
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     # Confirm it's your account
@@ -259,7 +257,7 @@ def get_accounts_positions(account_id: str, username: str = Depends(verify_cooki
 
     positions = {}
 
-    raw_positions = redis_client.hgetall(redis_dictionaries[3])
+    raw_positions = await redis_client.hgetall(redis_dictionaries[3])
 
     for x in raw_positions.values():
         x_positions = json.loads(x)
@@ -274,19 +272,19 @@ def get_accounts_positions(account_id: str, username: str = Depends(verify_cooki
 
 
 @app.get("/positions/ticker/{ticker}")
-def get_users_positions_for_ticker(ticker: str, username: str = Depends(verify_cookie)):
+async def get_users_positions_for_ticker(ticker: str, username: str = Depends(verify_cookie)):
 
     # Confirm it's a real ticker
-    raw_ticker = redis_client.hget(redis_dictionaries[2], ticker)
+    raw_ticker = await redis_client.hget(redis_dictionaries[2], ticker)
     if not raw_ticker:
         raise HTTPException(status_code=404, detail="This ticker does not exist")
 
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     positions = {}
 
-    raw_positions = redis_client.hgetall(redis_dictionaries[3])
+    raw_positions = await redis_client.hgetall(redis_dictionaries[3])
 
     for x in raw_positions.values():
         x_positions = json.loads(x)
@@ -307,16 +305,16 @@ def get_users_positions_for_ticker(ticker: str, username: str = Depends(verify_c
 
 
 @app.get("/positions/accounts/{account_id}/ticker/{ticker}")
-def get_accounts_positions_for_ticker(
+async def get_accounts_positions_for_ticker(
     ticker: str, account_id: str, username: str = Depends(verify_cookie)
 ):
 
     # Check ticker exists
-    raw_ticker = redis_client.hget(redis_dictionaries[2], ticker)
+    raw_ticker = await redis_client.hget(redis_dictionaries[2], ticker)
     if not raw_ticker:
         raise HTTPException(status_code=404, detail="This ticker does not exist")
 
-    raw_user = redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     user_data = json.loads(raw_user)
 
     # Confirm you have access to this account
@@ -327,7 +325,7 @@ def get_accounts_positions_for_ticker(
 
     positions = {}
 
-    raw_positions = redis_client.hgetall(redis_dictionaries[3])
+    raw_positions = await redis_client.hgetall(redis_dictionaries[3])
 
     for x in raw_positions.values():
         x_positions = json.loads(x)
@@ -369,12 +367,12 @@ async def create_trade(trade: list[Trade], username: str = Depends(verify_cookie
 
 async def individual_trade(username: str, trade: dict):
 
-    raw_user = await async_redis_client.hget(redis_dictionaries[0], username)
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
     if not raw_user:
         raise HTTPException(status_code=404, detail="This user does not exist")
     user_data = json.loads(raw_user)
 
-    raw_account = await async_redis_client.hget(
+    raw_account = await redis_client.hget(
         redis_dictionaries[1], trade["account_id"]
     )
     if not raw_account:
@@ -393,7 +391,7 @@ async def individual_trade(username: str, trade: dict):
         )
 
     # Check ticker exists
-    raw_ticker = await async_redis_client.hget(redis_dictionaries[2], trade["ticker"])
+    raw_ticker = await redis_client.hget(redis_dictionaries[2], trade["ticker"])
     if not raw_ticker:
         raise HTTPException(status_code=404, detail="This ticker does not exist")
 
@@ -403,7 +401,7 @@ async def individual_trade(username: str, trade: dict):
     if trade["quantity"] < 0:
         raise HTTPException(status_code=422, detail="Not a valid quantity value")
 
-    raw_positions = await async_redis_client.hgetall(redis_dictionaries[3])
+    raw_positions = await redis_client.hgetall(redis_dictionaries[3])
     position_key = None
     new_position = None
 
@@ -471,23 +469,23 @@ async def individual_trade(username: str, trade: dict):
             "Created_at": now,
             "Updated_at": now,
         }
-        await async_redis_client.hset(
+        await redis_client.hset(
             redis_dictionaries[3], position_key, json.dumps(position_data)
         )
     else:
-        raw_specific_position = await async_redis_client.hget(
+        raw_specific_position = await redis_client.hget(
             redis_dictionaries[3], position_key
         )
         specific_position = json.loads(raw_specific_position)
 
         specific_position["Quantity"] = new_position
         specific_position["Updated_at"] = now
-        await async_redis_client.hset(
+        await redis_client.hset(
             redis_dictionaries[3], position_key, json.dumps(specific_position)
         )
 
     # High Efficiency: Save to a single field named "d"
-    await async_redis_client.xadd("trade_stream", {"d": packed_bytes})
+    await redis_client.xadd("trade_stream", {"d": packed_bytes})
 
     return {"status": "success"}
 
