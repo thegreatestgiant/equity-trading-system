@@ -1,0 +1,33 @@
+services:
+    postgres:
+        image: postgres:16-alpine
+        container_name: trade_db
+        environment:
+            POSTGRES_USER: trade_admin
+            POSTGRES_PASSWORD: super_secret_password
+            POSTGRES_DB: trades_database
+        ports:
+            - "5432:5432"
+        volumes:
+            - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
+
+    redis:
+        image: redis:7-alpine
+        container_name: trade_cache
+        ports:
+            - "6379:6379"
+
+    rust_worker:
+        build:
+            context: .
+            dockerfile: Containerfile.trade-writer
+        container_name: rust_sync_worker
+        depends_on:
+            - postgres
+            - redis
+        environment:
+            - DATABASE_URL=host=postgres user=trade_admin password=super_secret_password dbname=trades_database
+            - REDIS_URL=redis://redis:6379/
+            - REDIS_STREAM_NAME=trade_stream
+            - REDIS_CONSUMER_GROUP=trade_processor_group
+            - WORKER_NAME=rust_worker_node_1
