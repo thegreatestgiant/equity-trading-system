@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Response, HTTPException, Cookie, Depends
+from fastapi import FastAPI, Response, HTTPException, Cookie, Depends, Request
 from redis.asyncio import Redis as AsyncRedis
 import jwt
 import uuid
 import json
 import time
 import msgpack
+import asyncpg
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
@@ -22,6 +23,13 @@ redis_dictionaries = [
     "Positions",
 ]  # redis dicts TODO update these tables once agrred upon naming convention
 
+postgres_port_number = (
+    5422  # Default Postgres port TODO update this port once agreed upon port
+)
+postgress_docker_name = (
+    "postgress"  # Postgress host address TODO update this address once agreed upon
+)
+
 day_in_sec = 24 * 60 * 60  # Number of seconds in a day
 
 secret_key = (
@@ -31,7 +39,7 @@ algorithm = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def create_cookie(username: str):
+def create_cookie(username: str, user_id: str):
 
     payload = {
         "username": username,
@@ -44,6 +52,22 @@ def create_cookie(username: str):
 
 # Initialize Redis client
 redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
+
+
+@app.lifespan("startup")
+async def startup():
+    app.state.pg_pool = await asyncpg.create_pool(
+        host=postgress_docker_name,
+        port=postgres_port_number,
+        user="postgres",
+        password="password",
+        database="trading",
+    )
+
+
+@app.lifespan("shutdown")
+async def shutdown():
+    await app.state.pg_pool.close()
 
 
 # Login details
@@ -146,11 +170,12 @@ async def verify_cookie(session: str = Cookie(None)):
         username = payload.get("username")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return username
+        return username,
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 
 # Account details
@@ -516,5 +541,129 @@ async def individual_trade(username: str, trade: dict):
 
     return {"status": "success"}
 
+
+# endregion
+
+# Get trade data
+# region
+
+
+@app.get("/trades")
+async def get_all_user_trades(request: Request, username: str = Depends(verify_cookie)):
+
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    rows = await request.app.state.pg_pool.fetch(
+        """
+        SELECT *
+        FROM trade
+        WHERE user_id = $1
+        ORDER BY trade_time DESC
+        """,
+        user_data["user_id"],
+    )
+
+    return [dict(row) for row in rows]
+
+@app.get("/trades/account/{account_id}")
+async def get_all_user_trades_for_account(account_id: str, request: Request, username: str = Depends(verify_cookie)):
+
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    if account_id not in user_data["accounts"]:
+        raise HTTPException(
+            status_code=401, detail="You do not have access to this account"
+        )
+
+    rows = await request.app.state.pg_pool.fetch(
+        """
+        SELECT *
+        FROM trade
+        WHERE user_id = $1
+            AND account_id = $2
+        ORDER BY trade_time DESC
+        """,
+        user_data["user_id"],
+        account_id
+    )
+
+    return [dict(row) for row in rows]
+
+@app.get("/trades/ticker/{ticker}")
+async def get_all_user_trades_for_ticker(ticker: str, request: Request, username: str = Depends(verify_cookie)):
+
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    raw_ticker = await redis_client.hget(redis_dictionaries[2], ticker)
+    if not raw_ticker:
+        raise HTTPException(status_code=404, detail="This ticker does not exist")
+
+    rows = await request.app.state.pg_pool.fetch(
+        """
+        SELECT *
+        FROM trade
+        WHERE user_id = $1
+            AND ticker = $2
+        ORDER BY trade_time DESC
+        """,
+        user_data["user_id"],
+        ticker
+    )
+
+    return [dict(row) for row in rows]
+
+@app.get("/trades/account/{account_id}/ticker.{ticker}")
+async def get_all_user_trades_for_account_for_ticker(account_id: str, ticker: str, request: Request, username: str = Depends(verify_cookie)):
+
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    if account_id not in user_data["accounts"]:
+        raise HTTPException(
+            status_code=401, detail="You do not have access to this account"
+        )
+    
+    raw_ticker = await redis_client.hget(redis_dictionaries[2], ticker)
+    if not raw_ticker:
+        raise HTTPException(status_code=404, detail="This ticker does not exist")
+
+    rows = await request.app.state.pg_pool.fetch(
+        """
+        SELECT *
+        FROM trade
+        WHERE user_id = $1
+            AND account_id = $2
+            AND ticker = $3
+        ORDER BY trade_time DESC
+        """,
+        user_data["user_id"],
+        account_id,
+        ticker
+    )
+
+    return [dict(row) for row in rows]
+
+@app.get("/trades/{trade_id}")
+async def get_specific_trade(trade_id: str, request: Request, username: str = Depends(verify_cookie)):
+
+    raw_user = await redis_client.hget(redis_dictionaries[0], username)
+    user_data = json.loads(raw_user)
+
+    rows = await request.app.state.pg_pool.fetch(
+        """
+        SELECT *
+        FROM trade
+        WHERE user_id = $1
+            AND trade_id = $2
+        ORDER BY trade_time DESC
+        """,
+        user_data["user_id"],
+        trade_id
+    )
+
+    return [dict(row) for row in rows]
 
 # endregion
