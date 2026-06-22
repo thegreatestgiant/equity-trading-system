@@ -23,21 +23,35 @@ valid_tickers = set()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global valid_tickers
-    logger.info("Starting up API")
-    app.state.pg_pool = await asyncpg.create_pool(
-        host=postgres_docker_name,
-        port=postgres_port_number,
-        user=postgres_user,
-        password=postgres_password,
-        database=postgres_db,
-    )
-    logger.info("Synced with postgres")
+    try:
+        logger.info("Starting up API")
+        app.state.pg_pool = await asyncpg.create_pool(
+            host=postgres_docker_name,
+            port=postgres_port_number,
+            user=postgres_user,
+            password=postgres_password,
+            database=postgres_db,
+        )
+        logger.info("Synced with postgres")
+    except Exception as e:
+        logger.error(f"PostgreSQL startup failure: {e}")
+        raise
+
+    try:
+        app.state.redis = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
+        await app.state.redis.ping()
+        logger.info("Redis connected")
+    except Exception as e:
+        logger.error(f"Redis startup failure: {e}")
+        raise
+
     with open("sp500.csv", newline="") as file:
         reader = csv.DictReader(file)
         valid_tickers = {row["ticker"].upper() for row in reader}
     logger.info("Loaded S&P Tickers")
     yield
     await app.state.pg_pool.close()
+    await app.state.redis.close()
     logger.info("Closed connection to Postgress")
     logger.info("Closing down API")
 
@@ -85,6 +99,59 @@ secret_key = (
 algorithm = "HS256"
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
+# Initialize Redis client
+redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start = time.perf_counter()
+
+    try:
+        response = await call_next(request)
+
+        duration_ms = (time.perf_counter() - start) * 1000
+
+        message = (
+            f"{request.method} {request.url.path} "
+            f"-> {response.status_code} "
+            f"in {duration_ms:.2f}ms"
+        )
+
+        if response.status_code >= 500:
+            logger.error(message)
+        elif response.status_code >= 400:
+            logger.warning(message)
+        else:
+            logger.info(message)
+
+        return response
+    
+    except HTTPException:
+        raise
+    
+    except asyncpg.PostgresError as e:
+        logger.error(f"PostgreSQL failure: {e}")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable"
+        )
+
+    except AsyncRedis.RedisError as e:
+        logger.error(f"Redis failure: {e}")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Redis unavailable"
+        )
+
+    except Exception as e:
+        logger.error(f"Unhandled exception: {e}")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 def create_cookie(username: str):
 
@@ -95,10 +162,6 @@ def create_cookie(username: str):
     }
     session_token = jwt.encode(payload, secret_key, algorithm=algorithm)
     return session_token
-
-
-# Initialize Redis client
-redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
 
 
 # endregion
@@ -120,7 +183,6 @@ class LoginRequest(BaseModel):  # Login class for json body
 @app.post("/register")
 async def register_user(request: RegisterRequest, response: Response):
     logger.info("Recieved new user request")
-    start = time.perf_counter()
 
     username = request.username
     password = request.password
@@ -162,8 +224,6 @@ async def register_user(request: RegisterRequest, response: Response):
         samesite="lax",
         max_age=day_in_sec,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"New User registered {user_id}. Completed in {duration_ms:2f}ms")
 
     return {
         "message": f"User registered successfully, your user_id is {user_id}. Save it somewhere safe."
@@ -173,7 +233,6 @@ async def register_user(request: RegisterRequest, response: Response):
 @app.post("/login")
 async def login_user(request: LoginRequest, response: Response):
     logger.info("Recieved new login request")
-    start = time.perf_counter()
 
     username = request.username
     password = request.password
@@ -209,8 +268,6 @@ async def login_user(request: LoginRequest, response: Response):
         samesite="lax",
         max_age=day_in_sec,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully logged in user {user_id}. Completed in {duration_ms:2f}ms")
 
     return {"message": "login succesful."}
 
@@ -218,10 +275,7 @@ async def login_user(request: LoginRequest, response: Response):
 @app.post("/logout")
 async def logout(response: Response):
     logger.info("Recieved new logout request")
-    start = time.perf_counter()
     response.delete_cookie(key="session", httponly=True, samesite="lax")
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Logged out user. Completed in {duration_ms:2f}ms")
 
     return {"message": "logged out"}
 
@@ -256,7 +310,6 @@ async def create_account(
     account_name: str, can_short: bool, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved new account request")
-    start = time.perf_counter()
 
     # Create account
     account_id = str(uuid.uuid4())
@@ -280,8 +333,6 @@ async def create_account(
     user_data["updated_at"] = now
 
     await redis_client.hset(redis_dictionaries[0], user_id, json.dumps(user_data))
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully created new account. Completed in {duration_ms:2f}ms")
 
     return {
         "message": f"Account created, here is you account_id {account_id}. Save it somewhere safe"
@@ -291,7 +342,6 @@ async def create_account(
 @app.post("/users/accounts/{account_id}")
 async def add_account(account_id: str, user_id: str = Depends(verify_cookie)):
     logger.info("Recieved new account sync to user request")
-    start = time.perf_counter()
 
     # Get account to ensure it exists
     raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
@@ -307,8 +357,6 @@ async def add_account(account_id: str, user_id: str = Depends(verify_cookie)):
     user_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     await redis_client.hset(redis_dictionaries[0], user_id, json.dumps(user_data))
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully added acount to user. Completed in {duration_ms:2f}ms")
 
     return {"message": f"Account added to user {user_data['username']}"}
 
@@ -316,12 +364,9 @@ async def add_account(account_id: str, user_id: str = Depends(verify_cookie)):
 @app.get("/users/allaccounts")
 async def get_all_accounts(user_id: str = Depends(verify_cookie)):
     logger.info("Recieved new get all user's accounts request")
-    start = time.perf_counter()
 
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     user_data = json.loads(raw_user)
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned all of the user's accounts. Completed in {duration_ms:2f}ms")
 
     return {"message": user_data["accounts_associated"]}
 
@@ -336,7 +381,6 @@ async def get_all_accounts(user_id: str = Depends(verify_cookie)):
 @app.get("/positions")
 async def get_users_positions(user_id: str = Depends(verify_cookie)):
     logger.info("Recieved request to get all of a user's positions")
-    start = time.perf_counter()
 
     # Get User data to check their accounts
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
@@ -372,8 +416,6 @@ async def get_users_positions(user_id: str = Depends(verify_cookie)):
                         "updated_at": x_positions["updated_at"],
                     }
                 )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned all of the user's positions. Completed in {duration_ms:2f}ms")
 
     return {"message": positions}
 
@@ -383,7 +425,6 @@ async def get_accounts_positions(
     account_id: str, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved request for all of an account's positions")
-    start = time.perf_counter()
 
     # Get User data
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
@@ -409,8 +450,6 @@ async def get_accounts_positions(
                 "created_at": x_positions["created_at"],
                 "updated_at": x_positions["updated_at"],
             }
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned account's positions. Completed in {duration_ms:2f}ms")
 
     return {"message": positions}
 
@@ -420,7 +459,6 @@ async def get_users_positions_for_ticker(
     ticker: str, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved request for user's positions for a ticker")
-    start = time.perf_counter()
 
     # Get User data
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
@@ -445,8 +483,6 @@ async def get_users_positions_for_ticker(
                     "updated_at": x_positions["updated_at"],
                 }
             ]
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned user's positions for ticker. Completed in {duration_ms:2f}ms")
 
     return {"message": positions}
 
@@ -456,7 +492,6 @@ async def get_accounts_positions_for_ticker(
     ticker: str, account_id: str, user_id: str = Depends(verify_cookie)
 ):
     logger.log("Recieved request for an account's position by ticker")
-    start = time.perf_counter()
 
     # Grab User data
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
@@ -481,8 +516,6 @@ async def get_accounts_positions_for_ticker(
         ):  # Correct account and ticker
             positions[x_positions["symbol_ticker"]] = x_positions["quantity"]
             break  # only one account and one ticker
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.log(f"Succesfully returned an account's position by ticker. Completed in {duration_ms:2f}ms")
 
     return {"message": positions}
 
@@ -508,7 +541,6 @@ class Trade(BaseModel):
 @app.post("/trade")
 async def create_trade(trade: list[Trade], user_id: str = Depends(verify_cookie)):
     logger.log("Recieved request to book trade data")
-    start = time.perf_counter()
 
     if len(trade) == 0:  # Didn't send any trade data
         logger.warning("There was no trade data")
@@ -518,8 +550,6 @@ async def create_trade(trade: list[Trade], user_id: str = Depends(verify_cookie)
         await individual_trade(
             user_id, trade_item.model_dump()
         )  # Converts from class to dictionary for sorting
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully logged all trade data. Completed in {duration_ms:2f}ms")
 
     return {"status": "success"}
 
@@ -681,7 +711,6 @@ async def individual_trade(user_id: str, trade: dict):
 @app.get("/trades")
 async def get_all_user_trades(request: Request, user_id: str = Depends(verify_cookie)):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     rows = await request.app.state.pg_pool.fetch(
         """
@@ -692,8 +721,6 @@ async def get_all_user_trades(request: Request, user_id: str = Depends(verify_co
         """,
         user_id,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -703,7 +730,6 @@ async def get_all_user_trades_for_account(
     account_id: str, request: Request, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     user_data = json.loads(raw_user)
@@ -724,8 +750,6 @@ async def get_all_user_trades_for_account(
         user_id,
         account_id,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -735,7 +759,6 @@ async def get_all_user_trades_for_ticker(
     ticker: str, request: Request, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     rows = await request.app.state.pg_pool.fetch(
         """
@@ -748,8 +771,6 @@ async def get_all_user_trades_for_ticker(
         user_id,
         ticker,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -762,7 +783,6 @@ async def get_all_user_trades_for_account_for_ticker(
     user_id: str = Depends(verify_cookie),
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     user_data = json.loads(raw_user)
@@ -785,8 +805,6 @@ async def get_all_user_trades_for_account_for_ticker(
         account_id,
         ticker,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -796,7 +814,6 @@ async def get_specific_trade(
     trade_id: str, request: Request, user_id: str = Depends(verify_cookie)
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     rows = await request.app.state.pg_pool.fetch(
         """
@@ -809,8 +826,6 @@ async def get_specific_trade(
         user_id,
         trade_id,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -823,7 +838,6 @@ async def get_all_user_trades_for_time(
     user_id: str = Depends(verify_cookie),
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     rows = await request.app.state.pg_pool.fetch(
         """
@@ -837,8 +851,6 @@ async def get_all_user_trades_for_time(
         time_start,
         time_end,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -852,7 +864,6 @@ async def get_all_user_trades_for_account_for_time(
     user_id: str = Depends(verify_cookie),
 ):
     logger.info("Recieved request for trade data. Completed in {duration_ms:2f}ms")
-    start = time.perf_counter()
 
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     user_data = json.loads(raw_user)
@@ -876,8 +887,6 @@ async def get_all_user_trades_for_account_for_time(
         time_start,
         time_end,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -891,7 +900,6 @@ async def get_all_user_trades_for_ticker_for_time(
     user_id: str = Depends(verify_cookie),
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     rows = await request.app.state.pg_pool.fetch(
         """
@@ -907,8 +915,6 @@ async def get_all_user_trades_for_ticker_for_time(
         time_start,
         time_end,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
@@ -923,7 +929,6 @@ async def get_all_user_trades_for_account_for_ticker_for_time(
     user_id: str = Depends(verify_cookie),
 ):
     logger.info("Recieved request for trade data")
-    start = time.perf_counter()
 
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     user_data = json.loads(raw_user)
@@ -949,8 +954,6 @@ async def get_all_user_trades_for_account_for_ticker_for_time(
         time_start,
         time_end,
     )
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(f"Succesfully returned trade data. Completed in {duration_ms:2f}ms")
 
     return [dict(row) for row in rows]
 
