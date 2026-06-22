@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response, HTTPException, Cookie, Depends, Request
 from redis.asyncio import Redis as AsyncRedis
+from redis.exceptions import RedisError
 import jwt
 import uuid
 import json
@@ -8,6 +9,7 @@ import msgpack
 import asyncpg
 import os
 import csv
+import sys
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from datetime import time as Time
@@ -78,18 +80,15 @@ redis_dictionaries = [
     "positions",
 ]  # redis dicts TODO update these tables once agrred upon naming convention
 
-LOG_FILE = Path("../../logs/FastAPI/app.log")
 
 try:
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    file_handler = logbook.FileHandler(
-        LOG_FILE,
+    stream_handler = logbook.StreamHandler(
+        sys.stdout,
         level="INFO",
         format_string="[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.channel}: {record.message}",
     )
 
-    file_handler.push_application()
+    stream_handler.push_application()
 
 except Exception as e:
     print(f"LOGGING FAILED: {e}")
@@ -141,7 +140,7 @@ async def logging_middleware(request: Request, call_next):
 
         raise HTTPException(status_code=503, detail="Database unavailable")
 
-    except AsyncRedis.RedisError as e:
+    except RedisError as e:
         logger.error(f"Redis failure: {e}")
 
         raise HTTPException(status_code=503, detail="Redis unavailable")
@@ -498,7 +497,7 @@ async def get_users_positions_for_ticker(
 async def get_accounts_positions_for_ticker(
     ticker: str, account_id: str, user_id: str = Depends(verify_cookie)
 ):
-    logger.log("Recieved request for an account's position by ticker")
+    logger.info("Recieved request for an account's position by ticker")
 
     # Grab User data
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
@@ -547,7 +546,7 @@ class Trade(BaseModel):
 
 @app.post("/trade")
 async def create_trade(trade: list[Trade], user_id: str = Depends(verify_cookie)):
-    logger.log("Recieved request to book trade data")
+    logger.info("Recieved request to book trade data")
 
     if len(trade) == 0:  # Didn't send any trade data
         logger.warning("There was no trade data")
