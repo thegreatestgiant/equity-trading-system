@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-ui
+  namespace: load-testing
+spec:
+  type: ClusterIP
+  selector:
+    app: locust
+  ports:
+    - port: 8089
+      targetPort: 8089

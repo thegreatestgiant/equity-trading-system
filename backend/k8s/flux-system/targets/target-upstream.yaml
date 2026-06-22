@@ -9,3 +9,16 @@ spec:
   url: https://github.com/SM26-Industrial-Software-Dev/equity-trading-system
   ref:
     branch: main
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: dev-stack
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: main-repo
+  path: ./backend/k8s/manifests/overlays/upstream # Points to Upstream overlay!
+  prune: true

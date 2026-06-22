@@ -1,4 +1,4 @@
-.PHONY: toolbox-up toolbox-down cluster-up cluster-down shell run kubectl rebuild logs-up logs-rebuild grafana-pass apply sync-dashboard test test-stop status status-wide status-svc
+.PHONY: toolbox-up toolbox-down cluster-up cluster-down shell run kubectl rebuild status status-wide status-svc
 
 # Allow overriding the container engine (defaults to docker)
 DOCKER ?= docker
@@ -28,24 +28,6 @@ rebuild: cluster-down toolbox-down
 	@sleep 2
 	$(MAKE) cluster-up
 
-# Logs-only targets
-logs-up:
-	@echo "Ensuring the k8s-toolbox container is running..."
-	$(DOCKER) compose up -d
-	@echo "Ensuring logs directory exists at project root..."
-	@mkdir -p $(HOST_ROOT)/logs
-	@echo "Spinning up the cluster with ONLY Logging infrastructure..."
-	$(DOCKER) exec -e HOST_ROOT="$(HOST_ROOT)" -i k8s-toolbox k3d cluster create --config backend/k8s/k3d-logs-only.yaml
-	@echo ""
-	@echo "=========================================================="
-	@echo "✅ LOGGING ENVIRONMENT READY"
-	@echo "📊 Grafana URL: http://grafana.localhost:8080"
-	@echo "👤 Username:    admin"
-	@echo "🔑 Password:    Rust!"
-	@echo "=========================================================="
-
-logs-rebuild: cluster-down toolbox-down logs-up
-
 # Opens an interactive terminal inside the toolbox for manual debugging
 shell:
 	$(DOCKER) exec -it k8s-toolbox bash
@@ -71,10 +53,6 @@ test:
 	@echo "✅ Locust is running!"
 	@echo "🌐 Open your browser to http://locust.localhost:8080"
 
-test-stop:
-	@echo "Putting Locust back to sleep..."
-	@$(DOCKER) exec -i k8s-toolbox kubectl scale deployment locust-load-tester --replicas=0
-
 # ==========================================
 # 📊 CLUSTER STATUS DASHBOARDS
 # ==========================================
@@ -99,3 +77,36 @@ sync:
 
 reload-grafana:
 	@$(DOCKER) exec -it k8s-toolbox kubectl delete pod -l app.kubernetes.io/name=grafana -n monitoring
+
+# ==========================================
+# 🌪️ CHAOS ENGINEERING & RESILIENCY TESTING
+# ==========================================
+
+# Kill all FastAPI pods. Watch the ReplicaSet instantly spin up new ones!
+chaos-api:
+	@echo "🔫 Terminating all FastAPI pods..."
+	@$(DOCKER) exec -it k8s-toolbox kubectl delete pods -l app=fastapi -n backend
+
+chaos-streamlit:
+	@echo "🔫 Terminating all FastAPI pods..."
+	@$(DOCKER) exec -it k8s-toolbox kubectl delete pods -l app=streamlit -n frontend
+
+# Kill the Rust worker. Watch it restart and resume reading from the Redis stream!
+chaos-worker:
+	@echo "🔫 Terminating Trade-Writer worker pods..."
+	@$(DOCKER) exec -it k8s-toolbox kubectl delete pods -l app=trade-writer -n backend
+
+# Kill the Redis database. Watch how the apps handle a temporary cache disconnect!
+chaos-redis:
+	@echo "🧨 Terminating Redis Pod..."
+	@$(DOCKER) exec -it k8s-toolbox kubectl delete pods -l app=redis -n backend
+
+# The ultimate chaos: Simulate a virtual machine/node crashing completely.
+chaos-node-stop:
+	@echo "🔥 Stopping the primary K3s node (Simulating Server Crash)..."
+	@$(DOCKER) exec -it k8s-toolbox k3d node stop k3d-dev-cluster-server-0
+
+# Bring the node back online and watch Kubernetes automatically recover the state.
+chaos-node-start:
+	@echo "🚑 Rebooting the primary K3s node..."
+	@$(DOCKER) exec -it k8s-toolbox k3d node start k3d-dev-cluster-server-0

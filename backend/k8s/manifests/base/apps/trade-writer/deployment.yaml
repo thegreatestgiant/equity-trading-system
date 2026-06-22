@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trade-writer
+  namespace: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trade-writer
+  template:
+    metadata:
+      labels:
+        app: trade-writer
+    spec:
+      containers:
+        - name: trade-writer
+          image: ghcr.io/yscohen/trade-writer:latest
+          imagePullPolicy: Always
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: POSTGRES_PASSWORD
+            
+            - name: POSTGRES_CONFIG
+              value: "host=postgres.backend.svc.cluster.local user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) dbname=trading"
+            
+            - name: REDIS_URL
+              value: "redis://redis.backend.svc.cluster.local:6379/"
+            - name: REDIS_STREAM_NAME
+              value: "trade_stream"
+            - name: REDIS_CONSUMER_GROUP
+              value: "trade_processor_group"
+            
+            # Use the Downward API to dynamically inject the specific Pod name!
+            - name: WORKER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name

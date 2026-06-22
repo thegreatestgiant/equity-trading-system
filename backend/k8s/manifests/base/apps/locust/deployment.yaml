@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-load-tester
+  namespace: load-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust
+  template:
+    metadata:
+      labels:
+        app: locust
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:latest
+          command: ["locust", "-f", "/mnt/locust/locustfile.py", "--host", "http://fastapi-service.backend.svc.cluster.local:80"]
+          ports:
+            - containerPort: 8089
+          volumeMounts:
+            - name: locust-script-volume
+              # Mount the specific file from the config map
+              mountPath: /mnt/locust/locustfile.py
+              subPath: locustfile.py
+      volumes:
+        - name: locust-script-volume
+          configMap:
+            name: locust-config

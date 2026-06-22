@@ -1,0 +1,28 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit
+  namespace: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamlit
+  template:
+    metadata:
+      labels:
+        app: streamlit
+    spec:
+      containers:
+        - name: streamlit
+          image: ghcr.io/williamtrump/equity-trading-frontend:latest
+          # 1. This forces K8s to pull the image fresh every time the pod starts!
+          imagePullPolicy: Always
+          ports:
+            # 2. Fixed the port to match Streamlit's default and your service.yaml
+            - containerPort: 8501
+          env:
+            - name: BACKEND_URL
+              # 3. Fixed the DNS to point to the Service name, and added http://
+              value: "http://fastapi-service.backend.svc.cluster.local"

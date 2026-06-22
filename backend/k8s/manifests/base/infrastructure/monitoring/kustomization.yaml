@@ -2,14 +2,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# 1. Define all your standard Kubernetes manifests here
 resources:
-  - 00-namespaces.yaml
-  - 01-fastapi.yaml
-  - 02-monitoring.yaml
-  - 03-locust.yaml
   - loki-helm-repo.yaml
   - loki-helm-release.yaml
+  - ingress.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
 
 configMapGenerator:
   - name: custom-fastapi-dashboard

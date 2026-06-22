@@ -1,3 +1,0 @@
-include:
-  - backend/DB/compose.yml
-  - backend/PubSub/compose.yml

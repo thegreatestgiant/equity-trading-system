@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: locust-config
+    namespace: load-testing
+    files:
+      # Automatically pulls your python script into the cluster state!
+      - locustfile.py=../../../../../Locust/locustfile.py

@@ -26,10 +26,10 @@ options:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
 volumes:
-  - volume: ${HOST_ROOT}/logs:/var/log/external_host
+  - volume: ${HOST_ROOT}/logs:/var/log/external_host:z
     nodeFilters:
       - agent:0
-  - volume: ${HOST_ROOT}/backend/Locust:/mnt/locust
+  - volume: ${HOST_ROOT}/backend/Locust:/mnt/locust:z
     nodeFilters:
       - "all"
 files:

@@ -10,5 +10,5 @@ spec:
     kind: GitRepository
     name: dev-repo
   # This points directly to the kustomization.yaml we made earlier!
-  path: ./backend/k8s/manifests
+  path: ./backend/k8s/manifests/overlays/dev-sean
   prune: true

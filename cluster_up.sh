@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 
 # Highly defensive scripting
-set -euo pipefail
+set -e
+set -u
+case "$SHELL" in
+*bash*) set -o pipefail ;;
+esac
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export HOST_ROOT="$PROJECT_ROOT"
 
-REPO_NAME="dev-repo" # Default
+REPO_NAME="main-repo"
 TARGET_FILE="target-upstream.yaml"
 
-if [[ "${1:-}" == "--max" ]]; then
+if [[ "${1:-}" == "--sean" ]]; then
+    REPO_NAME="dev-repo"
+    TARGET_FILE="target-fork.yaml"
+elif [[ "${1:-}" == "--max" ]]; then
     REPO_NAME="dev-repo-max"
-    TARGET_FILE="target-max.yaml" # Ensure this file exists in targets/
-elif [[ "${1:-}" == "--sm26" ]]; then
-    REPO_NAME="main-repo"
-    TARGET_FILE="target-sm26.yaml"
+    TARGET_FILE="target-max.yaml"
 fi
 
 echo "=========================================================="
@@ -83,7 +87,7 @@ $ENGINE compose down -v >/dev/null 2>&1
 set -e # Re-enable strict mode
 
 echo "📦 Starting the k8s-toolbox..."
-$ENGINE compose up -d
+$ENGINE compose up -d --build
 
 # Give the engine a moment to attach the volume before firing commands
 sleep 2
@@ -93,27 +97,21 @@ $ENGINE exec -e HOST_ROOT="$PROJECT_ROOT" -i k8s-toolbox k3d cluster create --co
 
 echo "🔄 Updating Source to: $REPO_NAME"
 
-# 1. Apply the target (which creates or updates the GitRepository)
+# 1. Apply the target (which now creates BOTH the GitRepository AND the Kustomization)
 $ENGINE exec -i k8s-toolbox kubectl apply -f "backend/k8s/flux-system/targets/$TARGET_FILE"
 
-# 2. Patch the Kustomization to point to the new GitRepository name
-# This changes the 'sourceRef' on the fly without editing files
-$ENGINE exec -i k8s-toolbox kubectl patch kustomization dev-stack \
-    -n flux-system \
-    --type=merge \
-    -p "{\"spec\": {\"sourceRef\": {\"name\": \"$REPO_NAME\"}}}"
-
-# 3. Force Reconciliation
+# 2. Force Reconciliation
 echo "⚡ Forcing Sync..."
 $ENGINE exec -i k8s-toolbox flux reconcile source git "$REPO_NAME"
 $ENGINE exec -i k8s-toolbox flux reconcile kustomization dev-stack --with-source
 
-echo "✅ Environment synced to $REPO_NAME"
+echo "✅ Environment synced to $REPO_NAME via $TARGET_FILE overlay"
 
 echo ""
 echo "=========================================================="
 echo "✅ FULL TRADING ENVIRONMENT DEPLOYED"
 echo "🌐 API URL:     http://localhost:8080 (or api.localhost)"
+echo "🌐 Streamlit URL:     http://streamlit.localhost:8080 (or api.localhost)"
 echo "🐛 Locust URL:  http://locust.localhost:8080"
 echo "📊 Grafana:     http://grafana.localhost:8080"
 echo "👤 Username:    admin"

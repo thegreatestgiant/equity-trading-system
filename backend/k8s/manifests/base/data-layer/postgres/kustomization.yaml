@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - service.yaml
+  - statefulset.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: postgres-init-schema
+    namespace: backend
+    files:
+      # This pulls the schema directly from your FastAPI source code.
+      # Adjust the relative path if needed based on your exact folder depth.
+      - 01-schema.sql=../../../../../FastAPI/schema.sql

@@ -1,7 +1,9 @@
+import os
 import requests
 import streamlit as st
 
-API_BASE_URL = "http://localhost:8000"  # update if your backend runs elsewhere
+API_BASE_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+
 
 
 def _get_session():
@@ -26,12 +28,15 @@ def _api_error(response):
 
 def login(username, password):
     session = _get_session()
-    response = session.get(
+    response = session.post(
         f"{API_BASE_URL}/login",
-        params={"username": username, "password": password},
+        json={"username": username, "password": password},
     )
 
     if response.status_code == 200:
+        # NOTE: backend does not currently return user_id on login.
+        # Once it does, capture it here, e.g.:
+        # return {"status": "success", "user_id": response.json().get("user_id")}
         return {"status": "success"}
     else:
         return {"status": "error", "message": _api_error(response)}
@@ -41,7 +46,7 @@ def register(username, password):
     session = _get_session()
     response = session.post(
         f"{API_BASE_URL}/register",
-        params={"username": username, "password": password},
+        json={"username": username, "password": password},
     )
 
     if response.status_code == 200:
@@ -123,32 +128,60 @@ def submit_trades(trades: list):
 # These don't have a real endpoint in main.py yet -- kept as mocks so the
 # UI doesn't break.
 def get_trades():
-    return [
-        {"trade_id": "T001", "symbol": "AAPL", "side": "BUY", "quantity": 100, "price": 200.00},
-        {"trade_id": "T002", "symbol": "TSLA", "side": "SELL", "quantity": 50, "price": 320.00},
-    ]
+    session = _get_session()
+    response = session.get(f"{API_BASE_URL}/trades")
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "message": _api_error(response)}
+
+
+def get_trades_by_account(account_id):
+    session = _get_session()
+    response = session.get(f"{API_BASE_URL}/trades/account/{account_id}")
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "message": _api_error(response)}
+
+
+def get_trades_by_ticker(ticker):
+    session = _get_session()
+    response = session.get(f"{API_BASE_URL}/trades/ticker/{ticker}")
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "message": _api_error(response)}
+
+
+def get_trades_by_account_and_ticker(account_id, ticker):
+    session = _get_session()
+    # NOTE: backend route uses a "." before {ticker}, not "/" -- confirm
+    # with your teammate whether this is intentional.
+    response = session.get(
+        f"{API_BASE_URL}/trades/account/{account_id}/ticker/{ticker}"
+    )
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "message": _api_error(response)}
 
 
 def get_trade_by_id(trade_id):
-    return {
-        "trade_id": trade_id,
-        "symbol": "AAPL",
-        "side": "BUY",
-        "quantity": 100,
-        "price": 200.00,
-    }
+    session = _get_session()
+    response = session.get(f"{API_BASE_URL}/trades/{trade_id}")
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "message": _api_error(response)}
 
 
-def get_trade_by_symbol(symbol):
-    return {
-        "trade_id": "T001",
-        "symbol": symbol,
-        "side": "BUY",
-        "quantity": 100,
-        "price": 200.00,
-    }
-
-
+# No real endpoint for this yet -- kept as a mock.
 def update_trade(trade_id, data):
     return {
         "status": "success",
@@ -159,14 +192,21 @@ def update_trade(trade_id, data):
 
 # --- Accounts ---------------------------------------------------------
 
-def create_account(can_short):
+def create_account(name, can_short):
     session = _get_session()
     response = session.post(
-        f"{API_BASE_URL}/users/account", params={"can_short": can_short}
+        f"{API_BASE_URL}/users/account",
+        params={"account_name": name, "can_short": can_short},
     )
 
+
     if response.status_code == 200:
-        return {"status": "success"}
+        data = response.json()
+        return {
+            "status": "success",
+            "account_id": data.get("account_id"),
+            "name": data.get("name"),
+        }
     else:
         return {"status": "error", "message": _api_error(response)}
 
@@ -177,6 +217,19 @@ def add_account_to_user(account_id):
 
     if response.status_code == 200:
         return {"status": "success"}
+    else:
+        return {"status": "error", "message": _api_error(response)}
+
+
+def get_user_accounts():
+    """Returns the logged-in user's full list of accounts, each with at
+    least account_id and name. Requires the new GET /users/accounts
+    endpoint."""
+    session = _get_session()
+    response = session.get(f"{API_BASE_URL}/users/allaccounts")
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
     else:
         return {"status": "error", "message": _api_error(response)}
 

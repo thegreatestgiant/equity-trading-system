@@ -1,0 +1,352 @@
+{
+  "title": "k3d Stats",
+  "uid": "9mfU3p-vk",
+  "schemaVersion": 34,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "FastAPI Hardware Metrics",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [
+        {
+          "id": 2,
+          "title": "Active Nodes",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "reduceOptions": { "calcs": ["lastNotNull"] }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "instant": true,
+              "expr": "max(kube_deployment_status_replicas_available{deployment=\"fastapi-api\"})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Total CPU Utilization (%)",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": ["lastNotNull"],
+              "fields": ""
+            },
+            "orientation": "auto"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "instant": true,
+              "expr": "sum(irate(container_cpu_usage_seconds_total{container=\"fastapi\"}[2m])) / (max(kube_deployment_status_replicas_available{deployment=\"fastapi-api\"}) * 0.1)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "CPU Usage per Pod (Cores)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 20
+              },
+              "unit": "short"
+            }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(irate(container_cpu_usage_seconds_total{container=\"fastapi\"}[2m])) by (pod)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Memory Usage per Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 20
+              },
+              "unit": "bytes"
+            }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(container_memory_working_set_bytes{container=\"fastapi\"}) by (pod)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Network I/O per Pod (bytes/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "unit": "Bps"
+            }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(irate(container_network_receive_bytes_total{namespace=\"backend\", container=\"\"}[2m])) by (pod)",
+              "legendFormat": "rx {{pod}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(irate(container_network_transmit_bytes_total{namespace=\"backend\", container=\"\"}[2m])) by (pod)",
+              "legendFormat": "tx {{pod}}",
+              "refId": "B"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "FastAPI HTTP Traffic (requires prometheus-fastapi-instrumentator)",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "panels": [
+        {
+          "id": 201,
+          "title": "Requests Per Second by Endpoint",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(http_requests_total{service=\"fastapi-service\"}[1m])) by (handler)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 202,
+          "title": "HTTP Error Rate (4xx & 5xx) by Status Code",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "fixed", "fixedColor": "red" }
+            }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(http_requests_total{service=\"fastapi-service\", status_code=~\"[45]..\"}[1m])) by (status_code)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 203,
+          "title": "P50 / P95 / P99 Response Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"fastapi-service\"}[1m])) by (le))",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"fastapi-service\"}[1m])) by (le))",
+              "legendFormat": "p95",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=\"fastapi-service\"}[1m])) by (le))",
+              "legendFormat": "p99",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 204,
+          "title": "In-flight Requests",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 26 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "reduceOptions": { "calcs": ["lastNotNull"] }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(http_requests_inprogress{service=\"fastapi-service\"})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 205,
+          "title": "Average Response Time by Endpoint",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 26 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "rate(http_request_duration_seconds_sum{service=\"fastapi-service\"}[1m]) / rate(http_request_duration_seconds_count{service=\"fastapi-service\"}[1m])",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Database Live Logs",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "panels": [
+        {
+          "id": 10,
+          "title": "Postgres",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 35 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "Loki" },
+              "expr": "{app=\"postgres\"}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Redis",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 35 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "Loki" },
+              "expr": "{app=\"redis\"}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Application Live Logs",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "panels": [
+        {
+          "id": 12,
+          "title": "Streamlit",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 46 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "Loki" },
+              "expr": "{app=\"streamlit\"}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "title": "FastAPI",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 46 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "Loki" },
+              "expr": "{app=\"fastapi\"}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

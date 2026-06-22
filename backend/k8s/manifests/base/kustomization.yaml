@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # 1. Namespaces must exist before anything else is deployed
+  - namespaces.yaml
+
+  # 2. Infrastructure Layer
+  - infrastructure/secrets
+  - infrastructure/monitoring
+
+  # 3. Data Layer
+  - data-layer/postgres
+  - data-layer/redis
+
+  # 4. Applications Layer
+  - apps/fastapi
+  - apps/locust
+  - apps/streamlit
+  - apps/trade-writer

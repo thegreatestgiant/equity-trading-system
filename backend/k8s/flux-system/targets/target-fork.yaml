@@ -6,6 +6,19 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
-  url: https://github.com/thegreatestgiant/equity-trading-system
+  url: https://github.com/thegreatestgiant/equity-trading-system.git # (Your Fork URL)
   ref:
-    branch: main # The branch you are currently working on
+    branch: main
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: dev-stack
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo
+  path: ./backend/k8s/manifests/overlays/dev-sean # Points to your overlay!
+  prune: true
