@@ -18,6 +18,13 @@ spec:
       containers:
         - name: postgres
           image: postgres:17-alpine
+          args:
+            - "-c"
+            - "log_statement=all"
+            - "-c"
+            - "log_connections=on"
+            - "-c"
+            - "log_disconnections=on"
           ports:
             - containerPort: 5432
           env:

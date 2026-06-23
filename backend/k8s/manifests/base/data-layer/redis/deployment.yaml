@@ -17,6 +17,7 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          args: ["--loglevel", "verbose"]
           ports:
             - containerPort: 6379
           resources:

@@ -12,9 +12,9 @@ services:
     networks:
       - k3d-network
     volumes:
-      - ${DOCKER_HOST_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${DOCKER_HOST_PATH:-/var/run/docker.sock}:/var/run/docker.sock:z
       - ../../:/workspace:z
-      - ${HOST_ROOT}:${HOST_ROOT}
+      - ${HOST_ROOT}:${HOST_ROOT}:z
 networks:
   k3d-network:
     name: k3d-network

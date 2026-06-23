@@ -7,13 +7,13 @@
     {
       "id": 100,
       "type": "row",
-      "title": "FastAPI Hardware Metrics",
+      "title": "FastAPI — Hardware Metrics",
       "collapsed": true,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "panels": [
         {
           "id": 2,
-          "title": "Active Nodes",
+          "title": "Active Replicas",
           "type": "stat",
           "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
@@ -155,15 +155,15 @@
     {
       "id": 200,
       "type": "row",
-      "title": "FastAPI HTTP Traffic (requires prometheus-fastapi-instrumentator)",
+      "title": "FastAPI — HTTP Traffic",
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
       "panels": [
         {
           "id": 201,
           "title": "Requests Per Second by Endpoint",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 2 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "fieldConfig": { "defaults": { "unit": "reqps" } },
           "targets": [
@@ -176,9 +176,9 @@
         },
         {
           "id": 202,
-          "title": "HTTP Error Rate (4xx & 5xx) by Status Code",
+          "title": "HTTP Error Rate (4xx & 5xx)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 2 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -196,9 +196,9 @@
         },
         {
           "id": 203,
-          "title": "P50 / P95 / P99 Response Latency",
+          "title": "Response Latency (P50 / P95 / P99)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 2 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
@@ -226,7 +226,7 @@
           "id": 204,
           "title": "In-flight Requests",
           "type": "stat",
-          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 26 },
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 10 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "options": {
             "colorMode": "value",
@@ -245,7 +245,7 @@
           "id": 205,
           "title": "Average Response Time by Endpoint",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 26 },
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 10 },
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
@@ -259,17 +259,45 @@
       ]
     },
     {
+      "id": 300,
+      "type": "row",
+      "title": "Trade Writer",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 2 },
+      "panels": [
+        {
+          "id": 301,
+          "title": "Trade Writer Logs",
+          "type": "logs",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 3 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "Loki" },
+              "expr": "{app=\"trade-writer\"}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": 101,
       "type": "row",
-      "title": "Database Live Logs",
+      "title": "Live Logs — Databases",
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
       "panels": [
         {
           "id": 10,
           "title": "Postgres",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 35 },
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 4 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -287,7 +315,7 @@
           "id": 11,
           "title": "Redis",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 35 },
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 4 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -306,15 +334,15 @@
     {
       "id": 102,
       "type": "row",
-      "title": "Application Live Logs",
+      "title": "Live Logs — Applications",
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
       "panels": [
         {
           "id": 12,
           "title": "Streamlit",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 46 },
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -332,7 +360,7 @@
           "id": 13,
           "title": "FastAPI",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 46 },
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 
 # Highly defensive scripting
-set -euo pipefail
+set -e
+set -u
+case "$SHELL" in
+*bash*) set -o pipefail ;;
+esac
 
-# 1. Establish the absolute Project Root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=========================================================="
 echo "🔄 Reloading Locust configuration..."
 echo "=========================================================="
 
-# 2. Check for Container Engine
+# 1. Detect Container Engine
 ENGINE=""
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     ENGINE="docker"
@@ -21,23 +24,13 @@ else
     exit 1
 fi
 
-# 3. Reload Logic
+# 2. Recreate the ConfigMap by piping the local Python file into the toolbox
 echo "📦 Updating ConfigMap 'locust-config'..."
+cat "$PROJECT_ROOT/backend/Locust/locustfile.py" |
+    $ENGINE exec -i k8s-toolbox sh -c 'kubectl create configmap locust-config --from-file=locustfile.py=/dev/stdin -o yaml --dry-run=client | kubectl apply -f -'
 
-# We use dry-run/apply to replace the CM in-place without manual deletion
-$ENGINE exec -i k8s-toolbox kubectl create configmap locust-config \
-    --from-file=locustfile.py="$PROJECT_ROOT/backend/Locust/locustfile.py" \
-    -n load-testing \
-    --dry-run=client -o yaml | $ENGINE exec -i k8s-toolbox kubectl apply -f -
+# 3. Force the Locust deployment to restart and pick up the new configuration
+echo "♻️ Restarting Locust pods to apply changes..."
+$ENGINE exec -i k8s-toolbox kubectl rollout restart deployment/locust-load-tester
 
-echo "🚀 Rolling out new Locust deployment..."
-$ENGINE exec -i k8s-toolbox kubectl rollout restart deployment locust-load-tester -n load-testing
-
-echo "✅ Locust reload complete. Waiting for pods..."
-$ENGINE exec -i k8s-toolbox kubectl rollout status deployment locust-load-tester -n load-testing
-
-echo ""
-echo "=========================================================="
-echo "✅ LOCUST RELOADED SUCCESSFULLY"
-echo "🌐 URL: http://locust.localhost:8080"
-echo "=========================================================="
+echo "✅ Locust configuration successfully reloaded!"

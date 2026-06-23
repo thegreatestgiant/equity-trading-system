@@ -12,6 +12,7 @@
 import asyncio
 import random
 import string
+import os
 import time
 import uuid
 import msgpack
@@ -25,7 +26,10 @@ import redis.asyncio as aioredis
 # just 26 tickers
 TICKERS = [c * 3 for c in string.ascii_uppercase]
 
-redis_client = aioredis.Redis(host="localhost", port=6379, db=0)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+
+# 2. Update line 27
+redis_client = aioredis.Redis(host=REDIS_HOST, port=6379, db=0)
 
 
 async def individual_trade(trade: dict):
@@ -50,7 +54,7 @@ async def individual_trade(trade: dict):
 
 
 async def generate_fake_trades():
-    redis_client = aioredis.from_url("redis://localhost:6379")
+    redis_client = aioredis.from_url(f"redis://{REDIS_HOST}:6379")
 
     try:
         for symbol in TICKERS:

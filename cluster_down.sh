@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 
 # Highly defensive scripting
-set -euo pipefail
+set -e
+set -u
 
-# Establish the absolute Project Root
+# 1. Dynamically find the project root and export it for Docker Compose
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export HOST_ROOT="$PROJECT_ROOT"
 
 echo "=========================================================="
 echo "🛑 Shutting Down the Full Equity Trading Environment"
 echo "=========================================================="
 
-# 1. Check for Container Engine
+# 2. Detect Container Engine
 ENGINE=""
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     ENGINE="docker"
@@ -21,16 +23,19 @@ else
     exit 1
 fi
 
-echo "🧹 Destroying K3d cluster..."
-# Temporarily disable strict exit for the deletion in case it doesn't exist
-set +e
-$ENGINE exec k8s-toolbox k3d cluster delete dev-cluster >/dev/null 2>&1
-set -e
-
-echo "📦 Tearing down k8s-toolbox and volumes..."
+# 3. Navigate to K8s directory
 cd "$PROJECT_ROOT/backend/k8s"
 
-# The -v flag ensures any attached docker volumes are cleanly wiped
-$ENGINE compose down -v
+# 4. Tear down the cluster using the toolbox
+echo "🧹 Destroying K3d cluster..."
+set +e # Disable strict mode temporarily in case the cluster is already gone
+$ENGINE exec k8s-toolbox k3d cluster delete dev-cluster >/dev/null 2>&1
 
-echo "✅ Full trading environment successfully shut down and cleaned!"
+# 5. Tear down the Compose stack and clean up zombie networks
+echo "📦 Tearing down k8s-toolbox and volumes..."
+$ENGINE compose down -v >/dev/null 2>&1
+$ENGINE network rm k3d-network >/dev/null 2>&1
+$ENGINE rm -f $($ENGINE ps -aq -f name=k3d-dev-cluster) >/dev/null 2>&1
+set -e
+
+echo "✅ Environment successfully destroyed."

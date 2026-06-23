@@ -26,25 +26,12 @@ options:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
 volumes:
-  - volume: ${HOST_ROOT}/logs:/var/log/external_host:z
-    nodeFilters:
-      - agent:0
   - volume: ${HOST_ROOT}/backend/Locust:/mnt/locust:z
     nodeFilters:
       - "all"
 files:
-  - description: "1. Bootstrap Flux Controllers"
+  - description: "Bootstrap Flux Controllers only — targets are applied by cluster_up.sh"
     source: ./flux-system/gotk-components.yaml
     destination: /var/lib/rancher/k3s/server/manifests/01-gotk-components.yaml
-    nodeFilters:
-      - "server:*"
-  - description: "2. Deploy GitRepo Pointer"
-    source: ./flux-system/targets/target-fork.yaml # <-- Change this to target-upstream.yaml to test Prod!
-    destination: /var/lib/rancher/k3s/server/manifests/02-git-repo.yaml
-    nodeFilters:
-      - "server:*"
-  - description: "3. Deploy Kustomization Sync"
-    source: ./flux-system/flux-kustomization.yaml
-    destination: /var/lib/rancher/k3s/server/manifests/03-flux-kustomization.yaml
     nodeFilters:
       - "server:*"

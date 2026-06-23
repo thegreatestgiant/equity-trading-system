@@ -29,17 +29,17 @@ spec:
                 secretKeyRef:
                   name: db-credentials
                   key: POSTGRES_PASSWORD
-            
+
             - name: POSTGRES_CONFIG
               value: "host=postgres.backend.svc.cluster.local user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) dbname=trading"
-            
+
             - name: REDIS_URL
               value: "redis://redis.backend.svc.cluster.local:6379/"
             - name: REDIS_STREAM_NAME
               value: "trade_stream"
             - name: REDIS_CONSUMER_GROUP
               value: "trade_processor_group"
-            
+
             # Use the Downward API to dynamically inject the specific Pod name!
             - name: WORKER_NAME
               valueFrom:
