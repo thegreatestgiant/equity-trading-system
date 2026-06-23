@@ -31,6 +31,8 @@ spec:
               value: "5432"
             - name: POSTGRES_DB
               value: "trading"
+            - name: TRADE_STREAM
+              value: "trade_stream"
           envFrom:
             - secretRef:
                 name: db-credentials
