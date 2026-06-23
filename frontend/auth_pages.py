@@ -38,6 +38,17 @@ def render_register_page():
     if submitted:
         result = register(username, password)
         if result["status"] == "success":
-            st.success(f"Account created for {result['username']}. You can now log in.")
+            # Auto-login with the same credentials, then drop the user
+            # straight into the main app instead of back at the login page.
+            login_result = login(username, password)
+            if login_result["status"] == "success":
+                st.session_state.username = username
+                st.success(f"Account created for {result['username']}. Logging you in...")
+                st.rerun()
+            else:
+                # Account was created but auto-login failed for some reason --
+                # fall back to telling the user to log in manually.
+                st.success(f"Account created for {result['username']}. You can now log in.")
+                st.error(login_result.get("message", "Auto-login failed."))
         else:
             st.error(result["message"])

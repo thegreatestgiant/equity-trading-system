@@ -10,19 +10,32 @@ from api_client import (
 )
 
 
+def _render_trades_table(result):
+    if result["status"] == "success":
+        if result["data"]:
+            st.table(result["data"])
+        else:
+            st.info("No trades found.")
+    else:
+        st.error(result["message"])
+
+
+@st.fragment(run_every="15s")
+def _all_trades_fragment():
+    _render_trades_table(get_trades())
+
+
 def render_all_trades_page():
     st.header("📜 Trade History")
     st.caption("GET /trades")
+    # No filters needed -- loads immediately and refreshes automatically,
+    # so trades booked from another tab show up here without a manual reload.
+    _all_trades_fragment()
 
-    if st.button("Load Trades"):
-        result = get_trades()
-        if result["status"] == "success":
-            if result["data"]:
-                st.table(result["data"])
-            else:
-                st.info("No trades found.")
-        else:
-            st.error(result["message"])
+
+@st.fragment(run_every="15s")
+def _trades_by_account_fragment(account_id):
+    _render_trades_table(get_trades_by_account(account_id))
 
 
 def render_trades_by_account_page():
@@ -32,14 +45,18 @@ def render_trades_by_account_page():
     account_id = st.text_input("Account ID")
 
     if st.button("Load Trades"):
-        result = get_trades_by_account(account_id)
-        if result["status"] == "success":
-            if result["data"]:
-                st.table(result["data"])
-            else:
-                st.info("No trades found.")
-        else:
-            st.error(result["message"])
+        st.session_state.trades_by_account_query = account_id
+
+    query = st.session_state.get("trades_by_account_query")
+    if query:
+        # Once a search has run, this fragment keeps polling on its own --
+        # no need to click "Load Trades" again to see new trades.
+        _trades_by_account_fragment(query)
+
+
+@st.fragment(run_every="15s")
+def _trades_by_ticker_fragment(ticker):
+    _render_trades_table(get_trades_by_ticker(ticker))
 
 
 def render_trades_by_ticker_page():
@@ -49,14 +66,16 @@ def render_trades_by_ticker_page():
     ticker = st.text_input("Ticker", "AAPL")
 
     if st.button("Load Trades"):
-        result = get_trades_by_ticker(ticker.upper())
-        if result["status"] == "success":
-            if result["data"]:
-                st.table(result["data"])
-            else:
-                st.info("No trades found.")
-        else:
-            st.error(result["message"])
+        st.session_state.trades_by_ticker_query = ticker.upper()
+
+    query = st.session_state.get("trades_by_ticker_query")
+    if query:
+        _trades_by_ticker_fragment(query)
+
+
+@st.fragment(run_every="15s")
+def _trades_by_account_and_ticker_fragment(account_id, ticker):
+    _render_trades_table(get_trades_by_account_and_ticker(account_id, ticker))
 
 
 def render_trades_by_account_and_ticker_page():
@@ -67,14 +86,20 @@ def render_trades_by_account_and_ticker_page():
     ticker = st.text_input("Ticker", "AAPL")
 
     if st.button("Load Trades"):
-        result = get_trades_by_account_and_ticker(account_id, ticker.upper())
-        if result["status"] == "success":
-            if result["data"]:
-                st.table(result["data"])
-            else:
-                st.info("No trades found.")
-        else:
-            st.error(result["message"])
+        st.session_state.trades_by_acct_ticker_query = (account_id, ticker.upper())
+
+    query = st.session_state.get("trades_by_acct_ticker_query")
+    if query:
+        _trades_by_account_and_ticker_fragment(*query)
+
+
+@st.fragment(run_every="15s")
+def _trade_by_id_fragment(trade_id):
+    result = get_trade_by_id(trade_id)
+    if result["status"] == "success":
+        st.json(result["data"])
+    else:
+        st.error(result["message"])
 
 
 def render_trade_by_id_page():
@@ -84,11 +109,11 @@ def render_trade_by_id_page():
     trade_id = st.text_input("Trade ID")
 
     if st.button("Load Trade"):
-        result = get_trade_by_id(trade_id)
-        if result["status"] == "success":
-            st.json(result["data"])
-        else:
-            st.error(result["message"])
+        st.session_state.trade_by_id_query = trade_id
+
+    query = st.session_state.get("trade_by_id_query")
+    if query:
+        _trade_by_id_fragment(query)
 
 
 def render_update_trade_page():

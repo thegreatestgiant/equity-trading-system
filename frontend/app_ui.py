@@ -84,6 +84,11 @@ else:
     if "jump_to_account" in st.session_state:
         page = "Positions by Account"
 
+    # Lets My Accounts send the user straight to Book a Trade with the
+    # account ID already filled in.
+    if st.session_state.pop("jump_to_trade_page", False):
+        page = "Enter Trade"
+
     PAGE_RENDERERS = {
         "Enter Trade": render_enter_trade_page,
         "My Accounts": render_my_accounts_page,

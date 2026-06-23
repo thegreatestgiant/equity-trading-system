@@ -76,7 +76,8 @@ def _render_builder_step():
 
     # Add a new trade form
     st.subheader("Add Trade")
-    account_id = st.text_input("Account ID")
+    prefilled_account = st.session_state.pop("jump_to_trade_account", "")
+    account_id = st.text_input("Account ID", value=prefilled_account)
     ticker = st.text_input("Ticker")
     direction_is_sell = st.toggle("Sell (off = Buy)")
     direction = "Sell" if direction_is_sell else "Buy"
