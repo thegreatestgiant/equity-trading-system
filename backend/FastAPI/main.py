@@ -32,8 +32,8 @@ async def lifespan(app: FastAPI):
             user=postgres_user,
             password=postgres_password,
             database=postgres_db,
-            min_size = 1,
-            max_size = 3
+            min_size=1,
+            max_size=3,
         )
         logger.info("Synced with postgres")
     except Exception as e:
@@ -111,24 +111,23 @@ redis_client = AsyncRedis(host=redis_host, port=redis_port_number, db=0)
 
 START_TIME = time.time()
 
+
 @app.get("/probe")
 async def probe():
-    hostname = socket.gethostname() # In K8s, this defaults to the Pod Name
+    hostname = socket.gethostname()  # In K8s, this defaults to the Pod Name
 
     return {
         "status": "ok",
-        "worker_name": os.getenv("Worker_Name", "not_set"),
         # K8s Downward API Info
         "k8s_node": os.getenv("NODE_NAME", "unknown"),
         "k8s_namespace": os.getenv("POD_NAMESPACE", "unknown"),
         "k8s_pod_ip": os.getenv("POD_IP", "unknown"),
         "k8s_pod_name": hostname,
         # GitOps Info
-        "git_commit": os.getenv("GIT_COMMIT", "unknown"),
         "environment": os.getenv("ENVIRONMENT", "dev"),
         # Runtime Info
         "process_id": os.getpid(),
-        "uptime_seconds": round(time.time() - START_TIME, 2)
+        "uptime_seconds": round(time.time() - START_TIME, 2),
     }
 
 

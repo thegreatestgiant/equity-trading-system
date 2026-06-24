@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: fastapi
-          image: ghcr.io/maxrabz/fastapi:latest
+          image: ghcr.io/maxrabz/fastapi:working
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
