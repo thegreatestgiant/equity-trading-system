@@ -5,18 +5,16 @@ import streamlit as st
 API_BASE_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 
-
 def _get_session():
     if "http" not in st.session_state:
         session = requests.Session()
-
         saved_cookie = st.session_state.get("saved_session_cookie")
         if saved_cookie:
             session.cookies.set("session", saved_cookie)
-
         st.session_state.http = session
-
     return st.session_state.http
+
+
 def _api_error(response):
     """Pulls a clean error message out of a failed response, falling back to
     raw text if the body isn't JSON (e.g. a 500 with no detail field).

@@ -60,49 +60,60 @@ else:
         st.session_state.username = None
         st.session_state.pop("saved_session_cookie", None)
         st.session_state.pop("http", None)
+
+        for key in ["remember_user", "remember_session"]:
+            if key in st.query_params:
+                del st.query_params[key]
+
         st.rerun()
 
     page_options = {
-        "🏦 My Accounts": "My Accounts",
-        "📊 All Positions": "All Positions",
-        "📊 Positions by Account": "Positions by Account",
-        "📊 Positions by Ticker": "Positions by Ticker",
-        "📊 Positions by Account & Ticker": "Positions by Account and Ticker",
-        "📜 Trade History": "All Trades",
-        "📜 Trade History by Account": "Trades by Account",
-        "📜 Trade History by Ticker": "Trades by Ticker",
-        "📜 Trade History by Account & Ticker": "Trades by Account and Ticker",
-        "🔍 Look Up Trade by ID": "Trade by ID",
-        "💸 Book a Trade": "Enter Trade",
-        "➕ Open New Account": "Create Account",
-        "✏️ Edit Account Settings": "Update Account",
-        "✏️ Edit Trade": "Update Trade",
+        "my_accounts": ("🏦 My Accounts", "My Accounts"),
+        "all_positions": ("📊 All Positions", "All Positions"),
+        "positions_by_account": ("📊 Positions by Account", "Positions by Account"),
+        "positions_by_ticker": ("📊 Positions by Ticker", "Positions by Ticker"),
+        "positions_by_account_ticker": ("📊 Positions by Account & Ticker", "Positions by Account and Ticker"),
+        "all_trades": ("📜 Trade History", "All Trades"),
+        "trades_by_account": ("📜 Trade History by Account", "Trades by Account"),
+        "trades_by_ticker": ("📜 Trade History by Ticker", "Trades by Ticker"),
+        "trades_by_account_ticker": ("📜 Trade History by Account & Ticker", "Trades by Account and Ticker"),
+        "trade_by_id": ("🔍 Look Up Trade by ID", "Trade by ID"),
+        "enter_trade": ("💸 Book a Trade", "Enter Trade"),
+        "create_account": ("➕ Open New Account", "Create Account"),
+        "update_account": ("✏️ Edit Account Settings", "Update Account"),
+        "update_trade": ("✏️ Edit Trade", "Update Trade"),
     }
 
-    # Reverse lookup so we can force the sidebar radio to the right label
-    # when another page (e.g. My Accounts) redirects us here.
-    label_for_page = {v: k for k, v in page_options.items()}
+    page_name_to_key = {page_name: key for key, (_, page_name) in page_options.items()}
 
-    # Lets other pages send the user to "Positions by Account" with a
-    # specific account already filled in, e.g. from a My Accounts link.
     if "jump_to_account" in st.session_state:
-        st.session_state.nav_radio = label_for_page["Positions by Account"]
+        st.query_params["page"] = "positions_by_account"
 
-    # Lets My Accounts send the user straight to Book a Trade with the
-    # account ID already filled in.
     if st.session_state.pop("jump_to_trade_page", False):
-        st.session_state.nav_radio = label_for_page["Enter Trade"]
+        st.query_params["page"] = "enter_trade"
 
-    # Lets the empty My Accounts state send the user straight to
-    # Create Account.
     if st.session_state.pop("jump_to_create_account_page", False):
-        st.session_state.nav_radio = label_for_page["Create Account"]
+        st.query_params["page"] = "create_account"
+
+    current_page_key = st.query_params.get("page", "my_accounts")
+
+    if current_page_key not in page_options:
+        current_page_key = "my_accounts"
+
+    page_keys = list(page_options.keys())
 
     st.sidebar.markdown("**Navigate**")
-    selected_label = st.sidebar.radio(
-        "Page", list(page_options.keys()), label_visibility="collapsed", key="nav_radio"
+    selected_page_key = st.sidebar.radio(
+        "Page",
+        page_keys,
+        format_func=lambda key: page_options[key][0],
+        index=page_keys.index(current_page_key),
+        label_visibility="collapsed",
     )
-    page = page_options[selected_label]
+
+    st.query_params["page"] = selected_page_key
+
+    page = page_options[selected_page_key][1]
 
     PAGE_RENDERERS = {
         "Enter Trade": render_enter_trade_page,
