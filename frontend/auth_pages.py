@@ -1,6 +1,7 @@
 import streamlit as st
 
 from api_client import login, register
+from persistent_login import remember_login
 
 
 def render_auth_sidebar():
@@ -23,6 +24,7 @@ def render_login_page():
         result = login(username, password)
         if result["status"] == "success":
             st.session_state.username = username
+            remember_login(username)
             st.success("Logged in")
             st.rerun()
         else:
@@ -43,6 +45,7 @@ def render_register_page():
             login_result = login(username, password)
             if login_result["status"] == "success":
                 st.session_state.username = username
+                remember_login(username)
                 st.success(f"Account created for {result['username']}. Logging you in...")
                 st.rerun()
             else:

@@ -8,49 +8,77 @@ from api_client import (
     get_positions_by_ticker,
     get_positions_by_account_and_ticker,
 )
-from account_picker import account_select
+from account_picker import account_select, get_account_name
 
 
 def _format_timestamp(value):
-    """Backend sends Unix timestamps (e.g. 1782243717.31) -- show them as
-    readable dates instead of raw floats."""
+    """Backend sends ISO timestamps -- show them more compactly."""
     try:
-        return datetime.datetime.fromtimestamp(float(value)).strftime("%b %d, %Y %I:%M %p")
+        return datetime.datetime.fromisoformat(str(value)).strftime("%b %d, %Y %I:%M %p")
     except (TypeError, ValueError):
-        return str(value)
+        try:
+            return datetime.datetime.fromtimestamp(float(value)).strftime("%b %d, %Y %I:%M %p")
+        except (TypeError, ValueError):
+            return str(value)
 
 
-def _render_positions_result(result, empty_message="No positions found."):
-    """Renders the {account_id: [position, ...]} shape shared by every
-    positions endpoint as readable cards instead of raw JSON."""
+def _position_card(position, account_id=None):
+    with st.container(border=True):
+        cols = st.columns([2, 2, 2, 3])
+        cols[0].write(f"**{position.get('symbol_ticker', '—')}**")
+        cols[1].write(f"Qty: {position.get('quantity', '—')}")
+        if account_id:
+            cols[2].caption(f"Account: {get_account_name(account_id)}")
+        cols[3].caption(f"Updated {_format_timestamp(position.get('updated_at'))}")
+
+
+def _render_positions_result(result, empty_message="No positions found.", account_id=None):
+    """Renders positions as readable cards instead of raw JSON.
+
+    Different endpoints return different shapes:
+    - GET /positions, /positions/ticker/{ticker}: {account_id: [position, ...]}
+    - GET /positions/accounts/{account_id}, .../ticker/{ticker}: a flat
+      list of positions directly, since the account is already known
+      from the URL and doesn't need to be repeated as a dict key.
+
+    account_id: when the account is already known (i.e. the caller is on
+    a "by account" page), pass it through so each card can show the
+    account's display name instead of nothing at all.
+    """
     if result["status"] != "success":
         st.error(result["message"])
         return
 
-    # NOTE: the data is the {account_id: [position, ...]} dict directly --
-    # no "message" wrapper key, despite what main.py's return statement
-    # might suggest. Confirmed against the raw st.json output that was
-    # working correctly before this page was rewritten.
-    positions_by_account = result["data"] if result["data"] else {}
+    data = result["data"]
 
-    if not positions_by_account:
+    if not data:
         st.info(empty_message)
         return
 
-    for account_id, positions in positions_by_account.items():
-        # account_name isn't always present depending on the endpoint --
-        # fall back to just the account ID if it's missing.
-        account_label = positions[0].get("account_name") if positions else None
-        st.subheader(account_label or f"Account `{account_id}`")
-        if account_label:
-            st.caption(f"`{account_id}`")
+    if isinstance(data, list):
+        # Flat list shape -- account is already known from the URL.
+        for position in data:
+            _position_card(position, account_id=account_id)
+        return
+
+    if isinstance(data, dict) and "symbol_ticker" in data:
+        # Single position dict, not wrapped in a list or grouped at all.
+        _position_card(data, account_id=account_id)
+        return
+
+    # Dict-of-accounts shape (or dict-of-tickers with single positions)
+    for key, value in data.items():
+        if isinstance(value, dict):
+            # value is itself a single position dict (e.g. keyed by ticker)
+            _position_card(value, account_id=key if key != value.get("symbol_ticker") else account_id)
+            continue
+
+        positions = value
+        account_label = get_account_name(key)
+        st.subheader(account_label)
 
         for position in positions:
-            with st.container(border=True):
-                cols = st.columns([2, 2, 3])
-                cols[0].write(f"**{position.get('symbol_ticker', '—')}**")
-                cols[1].write(f"Qty: {position.get('quantity', '—')}")
-                cols[2].caption(f"Updated {_format_timestamp(position.get('updated_at'))}")
+            _position_card(position, account_id=key)
 
         st.divider()
 
@@ -72,7 +100,7 @@ def render_all_positions_page():
 
 @st.fragment(run_every="15s")
 def _positions_by_account_fragment(account_id):
-    _render_positions_result(get_positions_by_account(account_id))
+    _render_positions_result(get_positions_by_account(account_id), account_id=account_id)
 
 
 def render_positions_by_account_page():
@@ -82,8 +110,6 @@ def render_positions_by_account_page():
     prefilled = st.session_state.pop("jump_to_account", None)
     account_id = account_select(preselect_account_id=prefilled)
 
-    # Auto-loads (and keeps polling) as soon as an account is selected --
-    # including immediately after jumping here from My Accounts.
     if account_id:
         _positions_by_account_fragment(account_id)
 
@@ -105,7 +131,9 @@ def render_positions_by_ticker_page():
 
 @st.fragment(run_every="15s")
 def _positions_by_account_and_ticker_fragment(account_id, ticker):
-    _render_positions_result(get_positions_by_account_and_ticker(account_id, ticker))
+    _render_positions_result(
+        get_positions_by_account_and_ticker(account_id, ticker), account_id=account_id
+    )
 
 
 def render_positions_by_account_and_ticker_page():
