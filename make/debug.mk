@@ -59,14 +59,26 @@ seed-all: ## 🌱 Spawning temporary pod to inject all test data (trades, users,
 		--restart=Never \
 		-- sh -c "mkdir /app && cd /app && tar xf - && uv run test_all.py"
 
-scale-debug: ## Temporarily suspend Flux and scale Streamlit (Usage: make scale-debug REPLICAS=X)
-	@if [ -z "$(REPLICAS)" ]; then echo "Error: REPLICAS is not set. Usage: make scale-debug REPLICAS=1"; exit 1; fi
+scale-streamlit: ## Temporarily suspend Flux and scale Streamlit (Usage: make scale-streamlit REPLICAS=X)
+	@if [ -z "$(REPLICAS)" ]; then echo "Error: REPLICAS is not set. Usage: make scale-streamlit REPLICAS=1"; exit 1; fi
 	@bash -c '\
-	trap "echo \"\n\n[Restoring] Caught Ctrl+C! Resuming Flux...\"; $(MAKE) run CMD=\"flux resume kustomization apps -n flux-system\"; exit 0" INT; \
+	trap "echo \"\n\n[Restoring] Caught Ctrl+C! Resuming Flux...\"; $(MAKE) --no-print-directory run CMD=\"flux resume kustomization 3-apps -n flux-system\"; exit 0" INT; \
 	echo "[Suspending] Pausing Flux reconciliation..."; \
-	$(MAKE) run CMD="flux suspend kustomization apps -n flux-system"; \
+	$(MAKE) --no-print-directory run CMD="flux suspend kustomization 3-apps -n flux-system"; \
 	echo "[Scaling] Imperatively overriding Streamlit replicas to $(REPLICAS)..."; \
-	$(MAKE) kubectl CMD="scale deployment streamlit --replicas=$(REPLICAS) -n dev-sean"; \
+	$(MAKE) --no-print-directory kubectl CMD="scale deployment streamlit --replicas=$(REPLICAS) -n frontend"; \
 	echo "\n=== OVERRIDE ACTIVE ==="; \
 	echo "Streamlit scaled to $(REPLICAS). Press Ctrl+C to release override and resume Flux..."; \
+	while true; do sleep 1; done'
+
+scale-api: ## Temporarily suspend Flux and scale API (Usage: make scale-api REPLICAS=X)
+	@if [ -z "$(REPLICAS)" ]; then echo "Error: REPLICAS is not set. Usage: make scale-api REPLICAS=1"; exit 1; fi
+	@bash -c '\
+	trap "echo \"\n\n[Restoring] Caught Ctrl+C! Resuming Flux...\"; $(MAKE) --no-print-directory run CMD=\"flux resume kustomization 3-apps -n flux-system\"; exit 0" INT; \
+	echo "[Suspending] Pausing Flux reconciliation..."; \
+	$(MAKE) --no-print-directory run CMD="flux suspend kustomization 3-apps -n flux-system"; \
+	echo "[Scaling] Imperatively overriding FastAPI replicas to $(REPLICAS)..."; \
+	$(MAKE) --no-print-directory kubectl CMD="scale deployment fastapi-api --replicas=$(REPLICAS) -n backend"; \
+	echo "\n=== OVERRIDE ACTIVE ==="; \
+	echo "FastAPI scaled to $(REPLICAS). Press Ctrl+C to release override and resume Flux..."; \
 	while true; do sleep 1; done'

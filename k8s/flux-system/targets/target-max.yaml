@@ -13,12 +13,43 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: dev-stack
+  name: 1-infra
   namespace: flux-system
 spec:
-  interval: 1m
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-max/infrastructure
+  prune: true
   sourceRef:
     kind: GitRepository
     name: dev-repo-max
-  path: ./k8s/manifests/overlays/dev-max # Points to Max's overlay!
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 2-data
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 1-infra
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-max/data-layer
   prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-max
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 3-apps
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 2-data
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-max/apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-max

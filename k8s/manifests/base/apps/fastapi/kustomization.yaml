@@ -6,6 +6,6 @@ namespace: backend
 
 resources:
   - deployment.yaml
-  - hpa.yaml
+  - keda.yaml
   - service.yaml
   - ingress.yaml

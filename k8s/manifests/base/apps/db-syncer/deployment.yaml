@@ -14,30 +14,20 @@ spec:
         app: db-syncer
     spec:
       initContainers:
-        - name: wait-for-db
+        - name: wait-for-infra
           image: busybox:1.36
           command:
             - sh
             - -c
             - |
-              echo "Waiting for PgBouncer/Postgres to become reachable..."
-              until nc -z pgbouncer.data.svc.cluster.local 6432; do
-                echo "Database not ready. Sleeping 2 seconds..."
-                sleep 2
+              echo "Waiting for PgBouncer and Loki..."
+              # Loop until ALL three services respond to a TCP ping
+              until nc -z pgbouncer.data.svc.cluster.local 6432 && \
+                    nc -z loki-stack.monitoring.svc.cluster.local 3100; do
+                echo "Infrastructure not ready. Sleeping 1 second..."
+                sleep 1
               done
-              echo "Database is online!"
-        - name: wait-for-loki
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for Loki to become reachable..."
-              until nc -z loki-stack.monitoring.svc.cluster.local 3100; do
-                echo "Loki not ready. Sleeping 2 seconds..."
-                sleep 2
-              done
-              echo "Loki is online! Proceeding with db-syncer startup."
+              echo "All infrastructure online! Booting db-syncer."
       containers:
         - name: db-syncer
           image: db-syncer-image
@@ -76,7 +66,10 @@ spec:
               value: "host=$(PG_ROUTING_HOST) port=$(PG_ROUTING_PORT) user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) dbname=$(PG_DATABASE)"
 
             - name: REDIS_URL
-              value: "redis://redis.data.svc.cluster.local:6379/"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_URL
             - name: RUST_LOG
               value: "debug"
 

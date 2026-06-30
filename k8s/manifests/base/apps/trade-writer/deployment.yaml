@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: trade-writer
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: trade-writer
@@ -14,30 +14,21 @@ spec:
         app: trade-writer
     spec:
       initContainers:
-        - name: wait-for-db
+        - name: wait-for-infrastructure
           image: busybox:1.36
           command:
             - sh
             - -c
             - |
-              echo "Waiting for PgBouncer/Postgres to become reachable..."
-              until nc -z pgbouncer.data.svc.cluster.local 6432; do
-                echo "Database not ready. Sleeping 2 seconds..."
-                sleep 2
+              echo "Waiting for Redis, PgBouncer, and Loki..."
+              # Loop until ALL three services respond to a TCP ping
+              until nc -z redis.data.svc.cluster.local 6379 && \
+                    nc -z pgbouncer.data.svc.cluster.local 6432 && \
+                    nc -z loki-stack.monitoring.svc.cluster.local 3100; do
+                echo "Infrastructure not ready. Sleeping 1 second..."
+                sleep 1
               done
-              echo "Database is online!"
-        - name: wait-for-loki
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for Loki to become reachable..."
-              until nc -z loki-stack.monitoring.svc.cluster.local 3100; do
-                echo "Loki not ready. Sleeping 2 seconds..."
-                sleep 2
-              done
-              echo "Loki is online! Proceeding with trade-writer startup."
+              echo "All infrastructure online! Booting trade-writer."
       containers:
         - name: trade-writer
           image: trade-writer-image
@@ -75,12 +66,26 @@ spec:
             - name: POSTGRES_CONFIG
               value: "host=$(PG_ROUTING_HOST) port=$(PG_ROUTING_PORT) user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) dbname=$(PG_DATABASE)"
 
+            - name: REDIS_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_ADDRESS
             - name: REDIS_URL
-              value: "redis://redis.data.svc.cluster.local:6379/"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_URL
             - name: REDIS_STREAM_NAME
-              value: "trade_stream"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_STREAM_NAME
             - name: REDIS_CONSUMER_GROUP
-              value: "trade_processor_group"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_CONSUMER_GROUP
 
             - name: LOKI_URL
               value: "http://loki-stack.monitoring.svc.cluster.local:3100"

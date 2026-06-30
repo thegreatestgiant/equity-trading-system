@@ -6,19 +6,49 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
-  url: https://github.com/thegreatestgiant/equity-trading-system.git 
+  url: https://github.com/thegreatestgiant/equity-trading-system.git
   ref:
     branch: main
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: dev-stack
+  name: 1-infra
   namespace: flux-system
 spec:
-  interval: 1m
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-sean/infrastructure
+  prune: true
   sourceRef:
     kind: GitRepository
     name: dev-repo-sean
-  path: ./k8s/manifests/overlays/dev-sean 
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 2-data
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 1-infra
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-sean/data-layer
   prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-sean
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 3-apps
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 2-data
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-sean/apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-sean

@@ -13,12 +13,42 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: dev-stack
+  name: 1-infra
   namespace: flux-system
 spec:
-  interval: 1m
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-will/infrastructure
+  prune: true
   sourceRef:
     kind: GitRepository
     name: dev-repo-will
-  path: ./k8s/manifests/overlays/dev-will
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 2-data
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 1-infra
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-will/data-layer
   prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-will
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 3-apps
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 2-data
+  interval: 5m
+  path: ./k8s/manifests/overlays/dev-will/apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: dev-repo-will

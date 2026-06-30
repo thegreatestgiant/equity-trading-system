@@ -14,8 +14,16 @@ status-svc: ## 🔌 ACTIVE NETWORK SERVICES:
 	@echo "🔌 ACTIVE NETWORK SERVICES:"
 	@$(DOCKER) exec -it k8s-toolbox kubectl get svc -A
 
+check-sync: ## Verify all sync stages are Ready
+	@$(DOCKER) exec -it k8s-toolbox flux get kustomizations
+
+sync-app: ## Fast-sync the apps layer (Usage: make sync-app)
+	@echo "[Syncing] Pulling latest source and reconciling 3-apps layer..."
+	@$(MAKE) --no-print-directory run CMD="flux reconcile kustomization 3-apps -n flux-system --with-source"
+
 sync:
-	$(DOCKER) exec -it k8s-toolbox flux reconcile kustomization dev-stack --with-source
+	$(DOCKER) exec -it k8s-toolbox flux reconcile source git dev-repo-sean
+	$(DOCKER) exec -it k8s-toolbox flux reconcile kustomization 1-infra --with-source
 
 adminer-info: ## 🌐 Adminer UI: http://adminer.localhost:8080
 	@echo "🌐 Adminer UI: http://adminer.localhost:8080"

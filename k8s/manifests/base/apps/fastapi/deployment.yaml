@@ -57,12 +57,22 @@ spec:
               value: "10000"
             - name: ROLLOUT_SURGE_PCT
               value: "25"
+
             - name: REDIS_HOST
-              value: "redis.data.svc.cluster.local"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_HOST
             - name: REDIS_PORT
-              value: "6379"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_PORT
             - name: TRADE_STREAM
-              value: "trade_stream"
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_STREAM_NAME
 
             # Explicit mapping to the new PG_ROUTING variables
             - name: POSTGRES_HOST

@@ -1,0 +1,67 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+images:
+  - name: api-image
+    newName: ghcr.io/sm26-industrial-software-dev/api
+    newTag: latest
+  - name: trade-writer-image
+    newName: ghcr.io/sm26-industrial-software-dev/trade-writer:latest
+  - name: db-syncer-image
+    newName: ghcr.io/sm26-industrial-software-dev/db-syncer:latest
+  - name: web-ui-image
+    newName: ghcr.io/sm26-industrial-software-dev/web-ui:latest
+
+resources:
+  - error-pages
+  - fastapi
+  - locust
+  - streamlit
+  - trade-writer
+  - db-syncer
+  - adminer
+
+configMapGenerator:
+  - name: db-routing
+    namespace: data
+    envs:
+      - ../shared-config/db-routing.env
+    options:
+      disableNameSuffixHash: true
+  - name: db-routing
+    namespace: backend
+    envs:
+      - ../shared-config/db-routing.env
+    options:
+      disableNameSuffixHash: true
+  - name: redis-config
+    namespace: backend
+    envs:
+      - ../shared-config/redis-config.env
+    options:
+      disableNameSuffixHash: true
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: redis-config
+      namespace: backend
+      fieldPath: data.REDIS_STREAM_NAME
+    targets:
+      - select:
+          kind: ScaledObject
+          name: trade-writer-scaler
+        fieldPaths:
+          - spec.triggers.*.metadata.stream
+  - source:
+      kind: ConfigMap
+      name: redis-config
+      namespace: backend
+      fieldPath: data.REDIS_CONSUMER_GROUP
+    targets:
+      - select:
+          kind: ScaledObject
+          name: trade-writer-scaler
+        fieldPaths:
+          - spec.triggers.*.metadata.consumerGroup

@@ -13,12 +13,42 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: dev-stack
+  name: 1-infra
   namespace: flux-system
 spec:
-  interval: 1m
+  interval: 5m
+  path: ./k8s/manifests/overlays/upstream/infrastructure
+  prune: true
   sourceRef:
     kind: GitRepository
     name: main-repo
-  path: ./k8s/manifests/overlays/upstream # Points to Upstream overlay!
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 2-data
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 1-infra
+  interval: 5m
+  path: ./k8s/manifests/overlays/upstream/data-layer
   prune: true
+  sourceRef:
+    kind: GitRepository
+    name: main-repo
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: 3-apps
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: 2-data
+  interval: 5m
+  path: ./k8s/manifests/overlays/upstream/apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: main-repo

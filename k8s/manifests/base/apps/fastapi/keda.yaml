@@ -1,0 +1,40 @@
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: fastapi-scaler
+  namespace: backend
+spec:
+  scaleTargetRef:
+    name: fastapi-api
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          # This replaces KEDA's cooldownPeriod. It tells the HPA to look back
+          # over the last 5 minutes (300s) of high-frequency trading spikes
+          # before deciding to scale down, preventing rapid pod churn.
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "70"
+    - type: prometheus
+      metadata:
+        # Be sure this exactly matches the DNS name of your Prometheus service
+        serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
+        metricName: fastapi_internal_rps
+        threshold: "60"
+        query: |
+          sum(rate(http_requests_total[1m]))

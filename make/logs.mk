@@ -38,6 +38,10 @@ logs-flux: ## 📜 Flux reconciliation events...
 	@echo "📜 Flux reconciliation events..."
 	@$(DOCKER) exec -it k8s-toolbox flux logs --follow
 
+logs-keda: ## 📜 KEDA Operator logs...
+	@echo "📜 KEDA Operator logs..."
+	@$(DOCKER) exec -it k8s-toolbox kubectl logs -l app=keda-operator -n keda --tail=100 -f
+
 logs-all: ## 📜 All pods (last 50 lines each, no follow)...
 	@echo "📜 All pods (last 50 lines each, no follow)..."
 	@$(DOCKER) exec -it k8s-toolbox kubectl logs -l app=fastapi    -n backend      --tail=50 --prefix
