@@ -19,6 +19,6 @@ spec:
   interval: 1m
   sourceRef:
     kind: GitRepository
-    name: dev-repo-yehuda
+    name: dev-repo-will
   path: ./k8s/manifests/overlays/dev-will
   prune: true

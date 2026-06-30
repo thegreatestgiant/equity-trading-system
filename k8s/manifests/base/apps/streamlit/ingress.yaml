@@ -5,6 +5,8 @@ metadata:
   name: streamlit-ingress
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: networking-streamlit-fallback@kubernetescrd
+    traefik.ingress.kubernetes.io/affinity: "true"
+    traefik.ingress.kubernetes.io/session-cookie-name: "streamlit-affinity"
 spec:
   rules:
     - host: streamlit.localhost
