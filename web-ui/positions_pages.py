@@ -2,6 +2,9 @@ import datetime
 
 import streamlit as st
 
+from positions_grid import flatten_positions, render_positions_grid
+
+
 from api_client import (
     get_all_positions,
     get_positions_by_account,
@@ -101,16 +104,22 @@ def _render_positions_result(result, empty_message="No positions found.", accoun
 
 @st.fragment(run_every="15s")
 def _all_positions_fragment():
-    _render_positions_result(
-        get_all_positions(),
+    result = get_all_positions()
+    if result["status"] != "success":
+        st.error(result["message"])
+        return
+
+    rows = flatten_positions(result["data"])
+    render_positions_grid(
+        rows,
         empty_message="No positions yet. Book a trade to see positions here.",
+        key="all_positions_grid",
     )
 
 
 def render_all_positions_page():
     st.header("📊 All Positions")
     st.caption("GET /positions")
-    # Loads immediately and keeps polling -- no button needed.
     _all_positions_fragment()
 
 
