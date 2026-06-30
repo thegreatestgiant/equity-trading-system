@@ -88,12 +88,15 @@ else:
 
     if "jump_to_account" in st.session_state:
         st.query_params["page"] = "positions_by_account"
+        st.session_state.nav_page = "positions_by_account"
 
     if st.session_state.pop("jump_to_trade_page", False):
         st.query_params["page"] = "enter_trade"
+        st.session_state.nav_page = "enter_trade"
 
     if st.session_state.pop("jump_to_create_account_page", False):
         st.query_params["page"] = "create_account"
+        st.session_state.nav_page = "create_account"
 
     current_page_key = st.query_params.get("page", "my_accounts")
 

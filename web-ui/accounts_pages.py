@@ -63,7 +63,6 @@ def render_create_account_page():
 def render_update_account_page():
     st.header("✏️ Edit Account Settings")
     st.caption("PUT /users/accounts/{account_id}")
-    st.caption("This endpoint doesn't exist in the backend yet -- showing mock data.")
 
     account_id = account_select()
     can_short = st.checkbox("Can Short")
