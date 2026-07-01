@@ -30,9 +30,19 @@ class EquityTradingUser(HttpUser):
         # create unique user
         username = f"user_{uuid.uuid4().hex[:8]}"
 
-        self.client.post(
-            "/register", json={"username": username, "password": "password123"}
-        )
+        for _ in range(3):
+            response = self.client.post(
+                "/register",
+                json={
+                    "username": username,
+                    "password": "password123",
+                },
+            )
+
+            if response.status_code == 200:
+                break
+        else:
+            raise Exception("Failed to register after 3 attempts")
 
         response = self.client.post(
             "/users/account", params={"account_name": "Trading", "can_short": True}
