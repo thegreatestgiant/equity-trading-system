@@ -66,3 +66,11 @@ def render_trades_grid(rows, empty_message="No trades found.", key="trades_grid"
         update_mode=GridUpdateMode.NO_UPDATE,
         key=key,
     )
+
+    # Force a rerun on first load so AgGrid JS has time to initialize.
+    # Without this the grid renders blank on first visit and only appears
+    # after a manual reload.
+    first_load_key = f"{key}_initialized"
+    if not st.session_state.get(first_load_key):
+        st.session_state[first_load_key] = True
+        st.rerun()
