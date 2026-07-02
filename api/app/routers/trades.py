@@ -129,12 +129,10 @@ async def get_specific_trade(
         """
         SELECT *
         FROM trades
-        WHERE user_id = $1
-            AND trade_id = $2
+        WHERE trade_id = $1
         ORDER BY created_at DESC
         LIMIT 30
         """,
-        user_id,
         trade_id,
     )
 

@@ -13,6 +13,18 @@ CREATE TABLE trades (
     other_account UUID -- accounts
 );
 
+CREATE INDEX idx_trades_user_created
+    ON trades (user_id, created_at DESC);
+
+CREATE INDEX idx_trades_user_account_created
+    ON trades (user_id, account_id, created_at DESC);
+
+CREATE INDEX idx_trades_user_ticker_created
+    ON trades (user_id, symbol_ticker, created_at DESC);
+
+CREATE INDEX idx_trades_user_ticker_created
+    ON trades (user_id, account_id, symbol_ticker, created_at DESC);
+
 CREATE TABLE positions (
     position_id UUID PRIMARY KEY,
     account_id UUID, -- accounts
