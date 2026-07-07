@@ -6,7 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  path: ./k8s/manifests/overlays/upstream/infrastructure
+  path: ./k8s/manifests/overlays/k3s/infrastructure 
   prune: true
   sourceRef:
     kind: GitRepository
@@ -21,7 +21,7 @@ spec:
   dependsOn:
     - name: 1-infra
   interval: 5m
-  path: ./k8s/manifests/overlays/upstream/data-layer
+  path: ./k8s/manifests/overlays/k3s/data-layer 
   prune: true
   sourceRef:
     kind: GitRepository
@@ -36,7 +36,7 @@ spec:
   dependsOn:
     - name: 2-data
   interval: 5m
-  path: ./k8s/manifests/overlays/upstream/apps
+  path: ./k8s/manifests/overlays/k3s/apps 
   prune: true
   sourceRef:
     kind: GitRepository
