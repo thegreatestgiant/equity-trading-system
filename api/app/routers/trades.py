@@ -1,9 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from datetime import datetime
 from app.core.logging import logger
 from app.core.security import verify_cookie
 from app.models.trade_models import Trade
-from app.services.trade_services import individual_trade, verify_account_access
+from app.services.trade_services import (
+    individual_trade,
+    verify_account_access,
+    verify_ticker_exists,
+)
 
 router = APIRouter(tags=["Trades"])
 
@@ -16,244 +20,105 @@ async def create_trade(trade: list[Trade], user_id: str = Depends(verify_cookie)
         logger.warning("There was no trade data")
         raise HTTPException(status_code=422, detail="Invalid Trade Data")
 
-    trade_return = []
+    trade_successes = []
+    trade_failures = []
 
     for trade_item in trade:  # Loop through each trade one at a time
-        trade_return.append(
-            await individual_trade(user_id, trade_item.model_dump())
-        )  # Converts from class to dictionary for sorting
+        try:
+            trade_successes.append(
+                await individual_trade(user_id, trade_item.model_dump())
+            )  # Converts from class to dictionary for sorting
+        except HTTPException as e:
+            logger.error(f"Trade failed: {e.detail}")
+            trade_failures.append({"Failure Reason": e.detail})
 
-    return {"message": trade_return}
+    return {
+        "message": f"Trades processed. Successes: {len(trade_successes)}, Failures: {len(trade_failures)}",
+        "successes": trade_successes,
+        "failures": trade_failures,
+    }
 
 
 @router.get("/trades")
-async def get_all_user_trades(request: Request, user_id: str = Depends(verify_cookie)):
-    logger.info("Recieved request for trade data")
-
-    rows = await request.app.state.pg_pool.fetch(
-        """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-    )
-
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/account/{account_id}")
-async def get_all_user_trades_for_account(
-    account_id: str, request: Request, user_id: str = Depends(verify_cookie)
-):
-    logger.info("Recieved request for trade data")
-
-    await verify_account_access(account_id, user_id)
-
-    rows = await request.app.state.pg_pool.fetch(
-        """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND account_id = $2
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        account_id,
-    )
-
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/ticker/{ticker}")
-async def get_all_user_trades_for_ticker(
-    ticker: str, request: Request, user_id: str = Depends(verify_cookie)
-):
-    logger.info("Recieved request for trade data")
-
-    rows = await request.app.state.pg_pool.fetch(
-        """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND symbol_ticker = $2
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        ticker,
-    )
-
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/account/{account_id}/ticker/{ticker}")
-async def get_all_user_trades_for_account_for_ticker(
-    account_id: str,
-    ticker: str,
+async def get_user_trades(
     request: Request,
     user_id: str = Depends(verify_cookie),
+    account_id: str | None = None,
+    ticker: str | None = None,
+    time_start: datetime | None = None,
+    time_end: datetime | None = None,
+    cursor_created_at: datetime | None = None,
+    cursor_trade_id: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
 ):
-    logger.info("Recieved request for trade data")
+    logger.info("Received request for trade data")
 
-    await verify_account_access(account_id, user_id)
-
-    rows = await request.app.state.pg_pool.fetch(
-        """
+    query = """
         SELECT *
         FROM trades
         WHERE user_id = $1
-            AND account_id = $2
-            AND symbol_ticker = $3
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        account_id,
-        ticker,
-    )
+    """
 
-    return [dict(row) for row in rows]
+    params = [user_id]
+    param = 2
 
-
-@router.get("/trades/{trade_id}")
-async def get_specific_trade(
-    trade_id: str, request: Request, user_id: str = Depends(verify_cookie)
-):
-    logger.info("Recieved request for trade data")
-
-    rows = await request.app.state.pg_pool.fetch(
+    if account_id is not None:
+        await verify_account_access(account_id, user_id)
+        query += f"""
+            AND account_id = ${param}
         """
-        SELECT *
-        FROM trades
-        WHERE trade_id = $1
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        trade_id,
-    )
+        params.append(account_id)
+        param += 1
 
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/time")
-async def get_all_user_trades_for_time(
-    request: Request,
-    time_start: datetime,
-    time_end: datetime,
-    user_id: str = Depends(verify_cookie),
-):
-    logger.info("Recieved request for trade data")
-
-    rows = await request.app.state.pg_pool.fetch(
+    if ticker is not None:
+        await verify_ticker_exists(ticker)
+        query += f"""
+            AND symbol_ticker = ${param}
         """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND created_at BETWEEN $2 AND $3
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        time_start,
-        time_end,
-    )
+        params.append(ticker)
+        param += 1
 
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/account/{account_id}/time")
-async def get_all_user_trades_for_account_for_time(
-    account_id: str,
-    request: Request,
-    time_start: datetime,
-    time_end: datetime,
-    user_id: str = Depends(verify_cookie),
-):
-    logger.info("Recieved request for trade data")
-
-    await verify_account_access(account_id, user_id)
-
-    rows = await request.app.state.pg_pool.fetch(
+    if time_start is not None:
+        query += f"""
+            AND created_at >= ${param}
         """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND account_id = $2
-            AND created_at BETWEEN $3 AND $4
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        account_id,
-        time_start,
-        time_end,
-    )
+        params.append(time_start)
+        param += 1
 
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/ticker/{ticker}/time")
-async def get_all_user_trades_for_ticker_for_time(
-    ticker: str,
-    request: Request,
-    time_start: datetime,
-    time_end: datetime,
-    user_id: str = Depends(verify_cookie),
-):
-    logger.info("Recieved request for trade data")
-
-    rows = await request.app.state.pg_pool.fetch(
+    if time_end is not None:
+        query += f"""
+            AND created_at <= ${param}
         """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND symbol_ticker = $2
-            AND created_at BETWEEN $3 AND $4
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        ticker,
-        time_start,
-        time_end,
-    )
+        params.append(time_end)
+        param += 1
 
-    return [dict(row) for row in rows]
-
-
-@router.get("/trades/account/{account_id}/ticker/{ticker}/time")
-async def get_all_user_trades_for_account_for_ticker_for_time(
-    account_id: str,
-    ticker: str,
-    request: Request,
-    time_start: datetime,
-    time_end: datetime,
-    user_id: str = Depends(verify_cookie),
-):
-    logger.info("Recieved request for trade data")
-
-    await verify_account_access(account_id, user_id)
-
-    rows = await request.app.state.pg_pool.fetch(
+    if cursor_created_at is not None and cursor_trade_id is not None:
+        query += f"""
+            AND (created_at, trade_id) < (${param}, ${param + 1})
         """
-        SELECT *
-        FROM trades
-        WHERE user_id = $1
-            AND account_id = $2
-            AND symbol_ticker = $3
-            AND created_at BETWEEN $4 AND $5
-        ORDER BY created_at DESC
-        LIMIT 30
-        """,
-        user_id,
-        account_id,
-        ticker,
-        time_start,
-        time_end,
-    )
+        params.append(cursor_created_at)
+        params.append(cursor_trade_id)
+        param += 2
 
-    return [dict(row) for row in rows]
+    query += f"""
+        ORDER BY created_at DESC, trade_id DESC
+        LIMIT ${param}
+    """
+
+    params.append(limit)
+
+    rows = await request.app.state.pg_pool.fetch(query, *params)
+
+    trades = [dict(row) for row in rows]
+
+    next_cursor = None
+    if rows:
+        next_cursor = {
+            "created_at": rows[-1]["created_at"],
+            "trade_id": rows[-1]["trade_id"],
+        }
+
+    return {
+        "trades": trades,
+        "next_cursor": next_cursor,
+    }

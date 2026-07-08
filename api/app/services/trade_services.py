@@ -22,28 +22,30 @@ async def individual_trade(user_id: str, trade: dict):
         )
     user_data = json.loads(raw_user)
 
-    #redis_user_get_duration = time.perf_counter() - start
+    # redis_user_get_duration = time.perf_counter() - start
 
     # Ensure it's a valid account
     raw_account = await redis_client.hget(redis_dictionaries[1], trade["account_id"])
     if not raw_account:
         logger.warning("Invalid account_id for booking")
-        raise HTTPException(status_code=404, detail=f"Account number {trade['account_id']} does not exist")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Account number {trade['account_id']} does not exist",
+        )
     account_data = json.loads(raw_account)
 
-    #redis_account_get_duration = time.perf_counter() - redis_user_get_duration - start
+    # redis_account_get_duration = time.perf_counter() - redis_user_get_duration - start
 
     # Confirm you have access to this account
     if trade["account_id"] not in user_data["accounts_associated"]:
         logger.warning("Invalid account_id for booking")
         raise HTTPException(
-            status_code=401, detail=f"You do not have access to account {trade['account_id']}"
+            status_code=401,
+            detail=f"You do not have access to account {trade['account_id']}",
         )
 
     # Check ticker exists
-    if trade["ticker"] not in ticker_service.valid_tickers:
-        logger.warning("Invalid ticker for booking")
-        raise HTTPException(status_code=422, detail=f"Ticker {trade['ticker']} does not exist")
+    await verify_ticker_exists(trade["ticker"])
 
     # Ensure calid direction
     if trade["direction"] not in ("Buy", "Sell"):
@@ -139,7 +141,8 @@ async def individual_trade(user_id: str, trade: dict):
                 ):  # Check if trying to short
                     logger.warning("Invalid short attempt")
                     raise HTTPException(
-                        status_code=403, detail=f"Account number {trade['account_id']} does not have permission to short"
+                        status_code=403,
+                        detail=f"Account number {trade['account_id']} does not have permission to short",
                     )
                 new_position = (
                     real_position_data["quantity"] + trade["quantity"]
@@ -163,7 +166,8 @@ async def individual_trade(user_id: str, trade: dict):
             if trade["direction"] != "Buy" and not account_data["can_short"]:
                 logger.warning("Invalid short attempt")
                 raise HTTPException(
-                    status_code=403, detail=f"Account number {trade['account_id']} does not have permission to short"
+                    status_code=403,
+                    detail=f"Account number {trade['account_id']} does not have permission to short",
                 )
             new_position = (
                 trade["quantity"]
@@ -248,7 +252,13 @@ async def verify_account_access(account_id: str, user_id: str):
     user_data = json.loads(raw_user)
 
     if account_id not in user_data["accounts_associated"]:
-        logger.warning("Invalid accound_id for user")
+        logger.warning("Invalid account_id for user")
         raise HTTPException(
             status_code=401, detail="You do not have access to this account"
         )
+
+
+async def verify_ticker_exists(ticker: str):
+    if ticker not in ticker_service.valid_tickers:
+        logger.warning("Invalid ticker")
+        raise HTTPException(status_code=422, detail=f"Ticker {ticker} does not exist")

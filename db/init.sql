@@ -14,16 +14,16 @@ CREATE TABLE trades (
 );
 
 CREATE INDEX idx_trades_user_created
-    ON trades (user_id, created_at DESC);
+    ON trades (user_id, created_at DESC, trade_id DESC);
 
 CREATE INDEX idx_trades_user_account_created
-    ON trades (user_id, account_id, created_at DESC);
+    ON trades (user_id, account_id, created_at DESC, trade_id DESC);
 
 CREATE INDEX idx_trades_user_ticker_created
-    ON trades (user_id, symbol_ticker, created_at DESC);
+    ON trades (user_id, symbol_ticker, created_at DESC, trade_id DESC);
 
 CREATE INDEX idx_trades_user_account_ticker_created
-    ON trades (user_id, account_id, symbol_ticker, created_at DESC);
+    ON trades (user_id, account_id, symbol_ticker, created_at DESC, trade_id DESC);
 
 CREATE TABLE positions (
     position_id UUID PRIMARY KEY,
