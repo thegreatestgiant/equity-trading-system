@@ -27,12 +27,6 @@ resources:
 
 configMapGenerator:
   - name: db-routing
-    namespace: data
-    envs:
-      - ../shared-config/db-routing.env
-    options:
-      disableNameSuffixHash: true
-  - name: db-routing
     namespace: backend
     envs:
       - ../shared-config/db-routing.env

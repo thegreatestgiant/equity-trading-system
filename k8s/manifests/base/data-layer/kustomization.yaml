@@ -6,3 +6,11 @@ resources:
   - redis
   - redis-proxy
   - pgbouncer
+
+configMapGenerator:
+  - name: db-routing
+    namespace: data
+    envs:
+      - ../shared-config/db-routing.env
+    options:
+      disableNameSuffixHash: true

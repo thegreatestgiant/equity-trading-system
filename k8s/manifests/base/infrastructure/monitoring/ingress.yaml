@@ -15,26 +15,6 @@ spec:
                 name: loki-stack-grafana
                 port:
                   number: 80
-    - host: control-plane.tailda280a.ts.net 
-      http:
-        paths:
-          - path: /grafana
-            pathType: Prefix
-            backend:
-              service:
-                name: loki-stack-grafana
-                port:
-                  number: 80
-    - host: streamlit.100.101.188.22.nip.io 
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: loki-stack-grafana
-                port:
-                  number: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
