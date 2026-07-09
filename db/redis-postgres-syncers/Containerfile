@@ -40,12 +40,17 @@ ENV CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
 
 
 ARG TARGETARCH
-FROM builder-${TARGETARCH} AS builder
+# --- deps-only stage: cached in CI ---
+FROM builder-${TARGETARCH} AS builder-deps
 
 RUN rustup target add $RUST_TARGET
 
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --target $RUST_TARGET --recipe-path recipe.json
+
+
+# --- build actual binary ---
+FROM builder-deps AS builder
 
 COPY . .
 ARG BIN_NAME

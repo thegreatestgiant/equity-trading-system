@@ -1,5 +1,5 @@
 ---
-name: CI/CD - Build and Publish Images
+name: Build and Publish Images
 
 permissions:
   contents: read
@@ -9,16 +9,15 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
-  slash_command:
-    name: build
-    events: [pull_request_comment]
 
 env:
   REGISTRY: ghcr.io
+  CANONICAL_REPO: SM26-Industrial-Software-Dev/equity-trading-system
 
 jobs:
-  build-and-publish:
-    name: Build (${{ matrix.component }})
+  # Build the two Python images
+  build-simple:
+    name: Build ${{ matrix.component }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,28 +29,17 @@ jobs:
           - component: web-ui
             context: web-ui
             dockerfile: web-ui/Dockerfile
-          - component: trade-writer
-            context: db/redis-postgres-syncers
-            dockerfile: db/redis-postgres-syncers/Containerfile
-            build_args: BIN_NAME=trade-writer
-          - component: db-syncer
-            context: db/redis-postgres-syncers
-            dockerfile: db/redis-postgres-syncers/Containerfile
-            build_args: BIN_NAME=db-syncer
-          - component: price-cacher
-            context: db/redis-postgres-syncers
-            dockerfile: db/redis-postgres-syncers/Containerfile
-            build_args: BIN_NAME=price-cacher
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Set lowercased owner
-        id: vars
-        run: |
-          echo "OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.component }}
+          tags: type=raw,value=latest
       - name: Log in to registry
-        if: github.event_name != 'pull_request' && github.repository == 'SM26-Industrial-Software-Dev/equity-trading-system'
+        if: github.event_name != 'pull_request' && github.repository == env.CANONICAL_REPO
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -63,11 +51,72 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && github.repository == env.CANONICAL_REPO }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+  # Build cargo-chef deps layer to use as cache
+  prepare-deps:
+    name: Build Rust deps with cargo-chef
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build dependency layer into shared cache
+        uses: docker/build-push-action@v5
+        with:
+          context: db/redis-postgres-syncers
+          file: db/redis-postgres-syncers/Containerfile
+          target: builder-deps
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha,scope=syncers-deps
+          cache-to: type=gha,mode=max,scope=syncers-deps
+
+  # Build Rust workers using pre-build deps cache
+  build-workers:
+    name: Build ${{ matrix.component }}
+    needs: prepare-deps
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [trade-writer, db-syncer, price-cacher]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Compute short SHA
+        id: vars
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.component }}
+          tags: type=raw,value=latest
+      - name: Log in to registry
+        if: github.event_name != 'pull_request' && github.repository == env.CANONICAL_REPO
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: db/redis-postgres-syncers
+          file: db/redis-postgres-syncers/Containerfile
+          platforms: linux/amd64,linux/arm64
           build-args: |
-            ${{ matrix.build_args }}
+            BIN_NAME=${{ matrix.component }}
             BUILD_SOURCE=github-actions
             BUILD_GIT_HASH=${{ steps.vars.outputs.SHORT_SHA }}
-          push: ${{ github.event_name != 'pull_request' && github.repository == 'SM26-Industrial-Software-Dev/equity-trading-system' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.OWNER_LOWER }}/${{ matrix.component }}:latest
-          cache-from: type=gha,scope=${{ matrix.component }}
+          push: ${{ github.event_name != 'pull_request' && github.repository == env.CANONICAL_REPO }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=syncers-deps
+            type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
