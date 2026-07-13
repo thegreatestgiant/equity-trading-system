@@ -37,7 +37,7 @@ def _accounts_list_fragment():
 
 def render_my_accounts_page():
     st.header("🏦 My Accounts")
-    st.warning("TEST MARKER — latest version as of 10:19 AM 7/13 (remove before ship)")
+    st.warning("TEST MARKER — latest version as of 11:45 AM 7/13 (remove before ship)")
     _accounts_list_fragment()
 
 
