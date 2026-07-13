@@ -426,6 +426,28 @@
               "refId": "A"
             }
           ]
+        },
+        {
+          "id": 402,
+          "title": "Price History Timeseries Cacher Logs",
+          "type": "logs",
+          "gridPos": { "h": 12, "w": 8, "x": 16, "y": 3 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "expr": "{app=\"price-timeseries-cacher\"} | json | __error__=\"\" | (_module_path =~ \"price_cacher|helpers\") or (level !~ \"(?i)debug\") | line_format \"{{.message}}\"",
+              "refId": "A"
+            }
+          ]
         }
       ]
     },

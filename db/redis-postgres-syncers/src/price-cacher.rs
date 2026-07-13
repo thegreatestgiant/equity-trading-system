@@ -34,22 +34,15 @@ async fn run() -> Result<()> {
 
     let mut redis_conn = helpers::connect_redis(redis_url).await;
 
-    let symbols = match helpers::fetch_sp500_symbols().await {
-        Ok(symbols) => symbols,
-        Err(err) => helpers::fatal("could not fetch S&P 500 symbol list", err).await,
-    };
-
-    if symbols.len() == 500 {
-        info!("fetched S&P 500 symbol list");
-    } else {
-        warn!("got {} symbols instead of 500", symbols.len());
-    }
+    let symbols = helpers::fetch_sp500_symbols()
+        .await
+        .context("could not fetch S&P 500 symbol list")?;
 
     loop {
-        match update_all_cached_prices(&mut redis_conn, &symbols).await {
-            Ok(cached) => info!("updated {cached} cached prices"),
-            Err(err) => helpers::fatal("failed to write cached prices to redis", err).await,
-        }
+        let cached = update_all_cached_prices(&mut redis_conn, &symbols)
+            .await
+            .context("failed to write cached prices to redis")?;
+        info!("updated {cached} cached prices");
 
         debug!(interval, "sleeping until next sync cycle");
         tokio::select! {
@@ -73,10 +66,7 @@ async fn update_all_cached_prices(
     let mut queued = 0;
     let mut skipped = 0;
 
-    let provider = match yahoo::YahooConnector::new() {
-        Ok(p) => p,
-        Err(e) => helpers::fatal("could not construct yahoo client", e).await,
-    };
+    let provider = yahoo::YahooConnector::new().context("could not construct yahoo client")?;
 
     for symbol in symbols {
         match get_quote_json(symbol, &provider).await {
@@ -102,10 +92,10 @@ async fn update_all_cached_prices(
     }
 
     debug!("writing {queued} quotes to redis in one pipeline");
-    match pipe.query_async::<()>(redis_conn).await {
-        Ok(_) => debug!("redis pipeline executed"),
-        Err(e) => helpers::fatal("failed to execute redis pipeline", e).await,
-    }
+    pipe.query_async::<()>(redis_conn)
+        .await
+        .context("failed to execute redis pipeline")?;
+    debug!("redis pipeline executed");
 
     Ok(queued)
 }

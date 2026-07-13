@@ -92,13 +92,13 @@ async fn run() -> Result<()> {
     // buffer to hold bulk COPY data. Pre-allocating ~500KB to avoid reallocations
     let mut copy_payload_buffer = String::with_capacity(512_000);
 
-    // opts to fetch new messages (">") in batches from the configured redis stream
+    // redis will wait for either BATCH_COUNT messages or 100ms, whichever is first
     let opts = StreamReadOptions::default()
         .group(&consumer_group, &worker_name)
-        // redis will wait for either BATCH_COUNT messages or 100ms, whichever is first
         .count(BATCH_COUNT)
         .block(100);
 
+    // new messages
     let new_message_id: [&str; 1] = [">"];
 
     // (needs to be assigned because of lifetime witchcraft in the select macro)
@@ -120,12 +120,7 @@ async fn run() -> Result<()> {
         // Select between waiting for Redis stream entries or a shutdown signal:
         let reply: StreamReadReply = tokio::select! {
             res = redis_conn.xread_options(&stream_name_arr, &new_message_id, &opts) => {
-                match res {
-                    Ok(r) => r,
-                    Err(e) => {
-                        helpers::fatal("Redis stream read failed", e).await
-                    }
-                }
+                res.context("Redis stream read failed")?
             }
             () = helpers::shutdown_signal() => {
                 info!("Shutdown signal received");
@@ -253,7 +248,8 @@ async fn process_batch(
             "Decoded no valid rows, ACK+trimming {} bad messages to discard them.",
             msg_ids.len()
         );
-        if let Err(err) = ack_and_trim_stream(redis_conn, stream_name, consumer_group, &msg_ids).await
+        if let Err(err) =
+            ack_and_trim_stream(redis_conn, stream_name, consumer_group, &msg_ids).await
         {
             error!(?err, "Failed to ACK and trim bad messages in Redis");
         }
@@ -291,10 +287,7 @@ async fn process_batch(
 ///
 /// Used for fresh messages, which are not expected to collide. Returns `Err`
 /// on failure so the caller knows not to ACK.
-async fn copy_direct(
-    pg_client: &tokio_postgres::Client,
-    copy_payload_buffer: &str,
-) -> Result<()> {
+async fn copy_direct(pg_client: &tokio_postgres::Client, copy_payload_buffer: &str) -> Result<()> {
     let sink = pg_client
         .copy_in(DIRECT_COPY_QUERY)
         .await

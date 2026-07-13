@@ -24,6 +24,10 @@ logs-cacher: ## 📜 price-cacher logs...
 	@echo "📜 price-cacher logs..."
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=price-cacher -n backend --tail=100 -f
 
+logs-timeseries: ## 📜 price-timeseries-cacher logs...
+	@echo "📜 price-timeseries-cacher logs..."
+	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=price-timeseries-cacher -n backend --tail=100 -f
+
 logs-adminer: ## 📜 Adminer logs...
 	@echo "📜 Adminer logs..."
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=adminer -n data --tail=100 -f
@@ -55,5 +59,6 @@ logs-all: ## 📜 All pods (last 50 lines each, no follow)...
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=trade-writer -n backend    --tail=50 --prefix
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=db-syncer  -n backend      --tail=50 --prefix
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=price-cacher  -n backend      --tail=50 --prefix
+	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=price-timeseries-cacher  -n backend      --tail=50 --prefix
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l cnpg.io/cluster=trading-db -n data --tail=50 --prefix
 	@$(DOCKER) exec -i k8s-toolbox kubectl logs -l app=redis      -n data         --tail=50 --prefix

@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: price-timeseries-cacher
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: price-timeseries-cacher
+  template:
+    metadata:
+      labels:
+        app: price-timeseries-cacher
+    spec:
+      initContainers:
+        - name: wait-for-loki
+          image: redis:8-alpine
+          command:
+            - sh
+            - -c
+            - |
+              echo "{\"message\":\"Waiting for Loki and Redis...\"}"
+              until nc -z loki-stack.monitoring.svc.cluster.local 3100 && \
+                    redis-cli -h redis-proxy.data.svc.cluster.local PING | grep -q PONG; do
+                echo "{\"message\":\"Infrastructure not ready. Sleeping 2 seconds...\"}"
+                sleep 2
+              done
+              echo "{\"message\":\"Infrastructure is online! Proceeding with price-timeseries-cacher startup.\"}"
+      containers:
+        - name: price-timeseries-cacher
+          image: price-timeseries-cacher-image
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "64Mi"
+            limits:
+              cpu: "75m"
+              memory: "256Mi"
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_URL
+
+            - name: LOKI_URL
+              value: "http://loki-stack.monitoring.svc.cluster.local:3100"
+
+            - name: DELAY
+              value: "180"
+
+            - name: WORKER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name

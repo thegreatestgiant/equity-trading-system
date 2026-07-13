@@ -11,6 +11,8 @@ images:
     newTag: dev
   - name: ghcr.io/sm26-industrial-software-dev/price-cacher
     newTag: dev
+  - name: ghcr.io/sm26-industrial-software-dev/price-timeseries-cacher
+    newTag: dev
 
 patches:
   - target:

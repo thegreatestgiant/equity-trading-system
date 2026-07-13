@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [trade-writer, db-syncer, price-cacher]
+        component: [trade-writer, db-syncer, price-cacher, price-timeseries-cacher]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

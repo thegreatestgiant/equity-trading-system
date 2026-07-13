@@ -14,6 +14,8 @@ images:
     newName: ghcr.io/sm26-industrial-software-dev/web-ui:latest
   - name: price-cacher-image
     newName: ghcr.io/sm26-industrial-software-dev/price-cacher:latest
+  - name: price-timeseries-cacher-image
+    newName: ghcr.io/sm26-industrial-software-dev/price-timeseries-cacher:latest
 
 resources:
   - error-pages
@@ -24,6 +26,7 @@ resources:
   - db-syncer
   - adminer
   - price-cacher
+  - price-timeseries-cacher
 
 configMapGenerator:
   - name: db-routing
