@@ -29,6 +29,7 @@ spec:
       save 60 1
       save 300 10
       dir /data
+      loadmodule /opt/redis-modules/redistimeseries.so
 
     image:
       registry: docker.io
@@ -45,6 +46,19 @@ spec:
         tag: "latest"
 
     master:
+      extraVolumes:
+        - name: redis-modules
+          emptyDir: {}
+      extraVolumeMounts:
+        - name: redis-modules
+          mountPath: /opt/redis-modules
+      initContainers:
+        - name: copy-module
+          image: redis/redis-stack-server:latest
+          command: ["sh", "-c", "cp /opt/redis-stack/lib/redistimeseries.so /opt/redis-modules/"]
+          volumeMounts:
+            - name: redis-modules
+              mountPath: /opt/redis-modules
       persistence:
         enabled: true
         size: 2Gi
@@ -58,6 +72,19 @@ spec:
 
     replica:
       replicaCount: 3
+      extraVolumes:
+        - name: redis-modules
+          emptyDir: {}
+      extraVolumeMounts:
+        - name: redis-modules
+          mountPath: /opt/redis-modules
+      initContainers:
+        - name: copy-module
+          image: redis/redis-stack-server:latest
+          command: ["sh", "-c", "cp /opt/redis-stack/lib/redistimeseries.so /opt/redis-modules/"]
+          volumeMounts:
+            - name: redis-modules
+              mountPath: /opt/redis-modules
       persistence:
         enabled: true
         size: 2Gi
