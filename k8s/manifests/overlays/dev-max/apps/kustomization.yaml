@@ -59,13 +59,26 @@ patches:
   #     - op: replace
   #       path: /spec/triggers
   #       value:
+  #         # =====================================================================
+  #         # MAX: Use Concurrency (Little's Law) instead of RPS for scaling!
+  #         # =====================================================================
+  #         # Why? If we scale on RPS (http_requests_total), we risk an autoscaling
+  #         # death spiral. When the DB gets slow, latency spikes, so total RPS drops.
+  #         # If RPS drops, HPA scales down, making the bottleneck worse!
+  #         #
+  #         # Instead, we scale on active, in-flight requests (Concurrency).
+  #         # Concurrency = RPS * Latency (Little's Law). 
+  #         # If the DB gets slow, requests pile up inside the pod, so concurrency
+  #         # skyrockets. This forces HPA to safely scale UP to rescue the system!
+  #         # =====================================================================
   #         - type: prometheus
   #           metadata:
   #             serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
-  #             metricName: fastapi_internal_rps
-  #             threshold: "100"
+  #             metricName: fastapi_concurrency
+  #             # Target 15 active requests in-flight per pod before scaling up
+  #             threshold: "15"
   #             query: |
-  #               sum(rate(http_requests_total[1m]))
+  #               sum(rate(http_request_duration_seconds_sum[1m]))
   #     - op: replace
   #       path: /spec/advanced/horizontalPodAutoscalerConfig/behavior/scaleDown/stabilizationWindowSeconds
   #       # Reduced seconds for faster local testing

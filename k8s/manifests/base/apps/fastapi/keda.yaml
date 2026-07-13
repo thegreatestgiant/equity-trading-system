@@ -34,7 +34,7 @@ spec:
       metadata:
         # Be sure this exactly matches the DNS name of your Prometheus service
         serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
-        metricName: fastapi_internal_rps
-        threshold: "60"
+        metricName: fastapi_concurrency
+        threshold: "5"
         query: |
-          sum(rate(http_requests_total[1m]))
+          sum(rate(http_request_duration_seconds_sum[1m]))
