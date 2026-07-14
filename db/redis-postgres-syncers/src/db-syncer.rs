@@ -226,15 +226,6 @@ async fn sync_json_hash_table<T>(
     Ok(())
 }
 
-#[derive(serde::Deserialize)]
-struct User {
-    username: String,
-    oauth_key: String,
-    accounts_associated: Vec<String>,
-    created_at: String,
-    updated_at: String,
-}
-
 async fn sync_users(
     pg_client: &tokio_postgres::Client,
     redis_conn: &mut redis::aio::MultiplexedConnection,
@@ -250,7 +241,7 @@ async fn sync_users(
             copy_columns: "user_id, username, oauth_key, accounts_associated, created_at, updated_at",
             conflict_column: "user_id",
             update_assignments: "username = EXCLUDED.username,\n    oauth_key = EXCLUDED.oauth_key,\n    accounts_associated = EXCLUDED.accounts_associated,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<User>("user", id, json),
+            parse_row: |id, json| parse_json_row::<helpers::User>("user", id, json),
             format_row: |id, data| {
                 format!(
                     "{}\t{}\t{}\t{}\t{}\t{}",
@@ -265,15 +256,6 @@ async fn sync_users(
         },
     )
     .await
-}
-
-#[derive(serde::Deserialize)]
-struct Account {
-    account_name: String,
-    positions: Vec<String>,
-    can_short: bool,
-    created_at: String,
-    updated_at: String,
 }
 
 async fn sync_accounts(
@@ -291,7 +273,7 @@ async fn sync_accounts(
             copy_columns: "account_id, account_name, positions, can_short, created_at, updated_at",
             conflict_column: "account_id",
             update_assignments: "account_name = EXCLUDED.account_name,\n    positions = EXCLUDED.positions,\n    can_short = EXCLUDED.can_short,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<Account>("account", id, json),
+            parse_row: |id, json| parse_json_row::<helpers::Account>("account", id, json),
             format_row: |id, data| {
                 format!(
                     "{}\t{}\t{}\t{}\t{}\t{}",
@@ -306,19 +288,6 @@ async fn sync_accounts(
         },
     )
     .await
-}
-
-#[derive(serde::Deserialize)]
-struct Position {
-    account_id: String,
-    symbol_ticker: String,
-    quantity: i32,
-    #[serde(default)]
-    average_cost: Option<f64>,
-    #[serde(default)]
-    total_realized_gains: Option<f64>,
-    created_at: String,
-    updated_at: String,
 }
 
 async fn sync_positions(
@@ -336,7 +305,7 @@ async fn sync_positions(
             copy_columns: "position_id, account_id, symbol_ticker, quantity, average_cost, total_realized_gains, created_at, updated_at",
             conflict_column: "position_id",
             update_assignments: "quantity = EXCLUDED.quantity,\n    average_cost = EXCLUDED.average_cost,\n    total_realized_gains = EXCLUDED.total_realized_gains,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<Position>("position", id, json),
+            parse_row: |id, json| parse_json_row::<helpers::Position>("position", id, json),
             format_row: |id, data| {
                 format!(
                     "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",

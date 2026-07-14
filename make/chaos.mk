@@ -4,9 +4,9 @@
 # 🌪️ CHAOS ENGINEERING (SCALE & KILL)
 # ==========================================
 SHELL := /bin/bash
-SCALE_APPS_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher price-timeseries-cacher
+SCALE_APPS_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher
 SCALE_DATA_BANK = redis trading-db trading-pooler
-KILL_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher price-timeseries-cacher redis trading-db grafana
+KILL_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher redis trading-db grafana
 
 # ------------------------------------------
 # 💀 KILL (Simulate Pod Crash)

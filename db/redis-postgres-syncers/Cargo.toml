@@ -18,6 +18,10 @@ name = "db-syncer"
 path = "src/db-syncer.rs"
 
 [[bin]]
+name = "redis-populator"
+path = "src/redis-populator.rs"
+
+[[bin]]
 name = "price-cacher"
 path = "src/price-cacher.rs"
 

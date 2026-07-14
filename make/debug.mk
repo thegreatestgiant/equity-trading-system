@@ -3,7 +3,7 @@
 # ==========================================
 # 🔄 ROLLING RESTARTS (BOUNCING)
 # ==========================================
-BOUNCE_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher price-timeseries-cacher poolers
+BOUNCE_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher poolers
 
 bounce: ## 🔄 Interactive menu to safely restart a deployment
 	@echo "============================================="

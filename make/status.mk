@@ -47,4 +47,4 @@ sync: ## Force Flux to reconcile (Accepts LAYER=all, apps, or data-layer)
 
 status-images: ## 🏷️  Check the exact Docker images running for our custom apps
 	@echo "🏷️  CUSTOM APP IMAGE VERSIONS:"
-	@$(MAKE) --no-print-directory kubectl CMD="get pods -A -l 'app in (fastapi, streamlit, trade-writer, db-syncer, price-cacher, price-timeseries-cacher)' -o custom-columns=NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image"
+	@$(MAKE) --no-print-directory kubectl CMD="get pods -A -l 'app in (fastapi, streamlit, trade-writer, db-syncer, price-cacher)' -o custom-columns=NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image"

@@ -368,7 +368,7 @@
           "id": 301,
           "title": "Trade Writer Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 6, "x": 0, "y": 3 },
+          "gridPos": { "h": 12, "w": 12, "x": 0, "y": 3 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -387,7 +387,7 @@
           "id": 401,
           "title": "DB Syncer Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 6, "x": 6, "y": 3 },
+          "gridPos": { "h": 12, "w": 12, "x": 12, "y": 3 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -409,7 +409,7 @@
           "id": 402,
           "title": "Price Cacher Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 6, "x": 12, "y": 3 },
+          "gridPos": { "h": 12, "w": 12, "x": 0, "y": 15 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -429,9 +429,9 @@
         },
         {
           "id": 403,
-          "title": "Price History Timeseries Cacher Logs",
+          "title": "Redis Populator Logs (Usually Empty)",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 6, "x": 18, "y": 3 },
+          "gridPos": { "h": 12, "w": 12, "x": 12, "y": 15 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -444,7 +444,7 @@
                 "type": "loki",
                 "uid": "Loki"
               },
-              "expr": "{app=\"price-timeseries-cacher\"} | json | __error__=\"\" | (_module_path =~ \"price_timeseries_cacher|helpers\") or (level !~ \"(?i)debug\") | line_format \"{{.message}}\"",
+              "expr": "{app=\"redis-populator\"} | json | __error__=\"\" | (_module_path =~ \"price_timeseries_cacher|helpers\") or (level !~ \"(?i)debug\") | line_format \"{{.message}}\"",
               "refId": "A"
             }
           ]

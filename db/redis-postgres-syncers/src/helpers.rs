@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use bytes::Bytes;
 use futures_util::SinkExt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::env;
 use tokio_postgres::{Client, CopyInSink, NoTls};
 use tracing::{debug, error, info, trace, warn};
@@ -129,6 +129,40 @@ pub async fn shutdown_signal() {
         () = ctrl_c => {},
         () = terminate => {},
     }
+}
+
+// domain models mirrored between the redis hashes and postgres tables.
+// `db-syncer` deserializes these from redis JSON to write into postgres,
+// `redis-populator` serializes them back to redis JSON from postgres.
+#[derive(Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+    pub oauth_key: String,
+    pub accounts_associated: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Account {
+    pub account_name: String,
+    pub positions: Vec<String>,
+    pub can_short: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Position {
+    pub account_id: String,
+    pub symbol_ticker: String,
+    pub quantity: i32,
+    #[serde(default)] // use default so won't fail until API add these fields
+    pub average_cost: Option<f64>,
+    #[serde(default)]
+    pub total_realized_gains: Option<f64>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Deserialize)]
