@@ -13,3 +13,9 @@ configMapGenerator:
       - ../shared-config/db-routing.env
     options:
       disableNameSuffixHash: true
+  - name: redis-config
+    namespace: data
+    envs:
+      - ../shared-config/redis-config.env
+    options:
+      disableNameSuffixHash: true
