@@ -229,7 +229,31 @@ bootstrap_flux() {
     echo "✅ Flux bootstrap complete!"
 }
 
+# Function to setup Make Developer Toolbox
+setup_make_toolbox() {
+    echo "📦 Installing Make (Debian)..."
+    if ! command -v make &>/dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y make
+    else
+        echo "✅ Make is already installed."
+    fi
 
+    echo "⬇️ Downloading Developer Toolbox (Makefiles)..."
+    
+    local REPO_OWNER="SM26-Industrial-Software-Dev"
+    local REPO_NAME="equity-trading-system"
+    local REF="main"
+
+    read -p "Branch or tag to fetch Makefiles from [main]: " input_ref
+    REF="${input_ref:-main}"
+
+    mkdir -p ~/make
+    curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REF}/Makefile" -o ~/Makefile
+    curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REF}/make/k3s.mk" -o ~/make/k3s.mk
+    
+    echo "✅ Make commands imported successfully. Run 'make help' to see available commands."
+}
 
 # Function to enable Tailscale Funnel
 update_self() {
@@ -347,11 +371,12 @@ while true; do
     echo "4) List Nodes"
     echo "5) Configure Local USB Storage"
     echo "6) Bootstrap FluxCD"
-    echo "7) Uninstall K3s"
-    echo "8) Update Manager"
-    echo "9) Exit"
+    echo "7) Setup Make Toolbox"
+    echo "8) Uninstall K3s"
+    echo "9) Update Manager"
+    echo "10) Exit"
     echo "======================================"
-    read -p "Select an option [1-9]: " choice
+    read -p "Select an option [1-10]: " choice
 
     case $choice in
     1) install_control_plane ;;
@@ -360,9 +385,10 @@ while true; do
     4) list_nodes ;;
     5) setup_local_storage ;;
     6) bootstrap_flux ;;
-    7) uninstall_k3s ;;
-    8) update_self ;;
-    9)
+    7) setup_make_toolbox ;;
+    8) uninstall_k3s ;;
+    9) update_self ;;
+    10)
         echo "Goodbye!"
         exit 0
         ;;
