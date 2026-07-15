@@ -1,4 +1,4 @@
-.PHONY: k3s-status k3s-events k3s-ks k3s-sync k3s-logs k3s-db-backup k3s-db-restore k3s-db-clear
+.PHONY: status events ks sync logs db-backup db-restore db-clear
 
 # ===============================================
 # 🚀 K3S CONTROL PANEL (DEBIAN) SPECIFIC COMMANDS
@@ -25,7 +25,7 @@ sync: ## Force Flux to reconcile (K3s)
 
 logs: ## 📜 Stream logs for a specific pod (K3s)
 	@if [ -z "$(POD)" ] && [ -z "$(APP)" ]; then \
-		echo "❌ Please specify an app or pod. Example: make k3s-logs APP=fastapi"; \
+		echo "❌ Please specify an app or pod. Example: make logs APP=fastapi"; \
 	elif [ -n "$(APP)" ]; then \
 		kubectl logs -f -l app=$(APP) --all-containers=true --max-log-requests=6; \
 	else \
