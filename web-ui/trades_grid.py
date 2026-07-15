@@ -89,6 +89,7 @@ def render_trades_grid(rows, empty_message="No trades found.", key="trades_grid"
             "browserDatePicker": True,
         },
     )
+    gb.configure_grid_options(enableCellTextSelection=True, ensureDomOrder=True)
 
     grid_options = gb.build()
 

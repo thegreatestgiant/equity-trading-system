@@ -83,6 +83,7 @@ def render_positions_grid(rows, empty_message="No positions found.", key="positi
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(sortable=True, filter=True, resizable=True)
     gb.configure_pagination(paginationAutoPageSize=True)
+    gb.configure_grid_options(enableCellTextSelection=True, ensureDomOrder=True)
     grid_options = gb.build()
 
     AgGrid(
