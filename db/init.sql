@@ -13,17 +13,17 @@ CREATE TABLE trades (
     other_account UUID -- accounts
 );
 
-CREATE INDEX idx_trades_user_created
-    ON trades (user_id, created_at DESC, trade_id DESC);
+CREATE INDEX idx_trades_account_created
+    ON trades (account_id, created_at DESC, trade_id DESC);
 
-CREATE INDEX idx_trades_user_account_created
-    ON trades (user_id, account_id, created_at DESC, trade_id DESC);
+CREATE INDEX idx_trades_account_user__created
+    ON trades (account_id, user_id, created_at DESC, trade_id DESC);
 
-CREATE INDEX idx_trades_user_ticker_created
-    ON trades (user_id, symbol_ticker, created_at DESC, trade_id DESC);
+CREATE INDEX idx_trades_account_ticker_created
+    ON trades (account_id, symbol_ticker, created_at DESC, trade_id DESC);
 
-CREATE INDEX idx_trades_user_account_ticker_created
-    ON trades (user_id, account_id, symbol_ticker, created_at DESC, trade_id DESC);
+CREATE INDEX idx_trades_account_user_ticker_created
+    ON trades (account_id, user_id, symbol_ticker, created_at DESC, trade_id DESC);
 
 CREATE TABLE positions (
     position_id UUID PRIMARY KEY,

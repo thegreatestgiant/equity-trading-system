@@ -2,17 +2,19 @@ import logbook
 import sys
 import json
 
+
 def json_formatter(record, handler):
     # Package the log data into a dictionary and dump it to JSON
     log_entry = {
         "timestamp": record.time.isoformat(),
         "level": record.level_name,
         "target": record.channel,
-        "message": record.message
+        "message": record.message,
     }
     if record.exc_info:
         log_entry["exception"] = record.formatted_exception
     return json.dumps(log_entry)
+
 
 try:
     stream_handler = logbook.StreamHandler(sys.stdout, level="INFO")

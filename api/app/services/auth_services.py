@@ -5,6 +5,7 @@ import uuid
 from app.core.redis import redis_client, redis_dictionaries
 from app.core.security import pwd_context
 from app.core.logging import logger
+from app.core.config import DAY_IN_SEC
 
 
 async def register_valid_user(username: str, password: str):
@@ -49,9 +50,13 @@ async def login_valid_user(username: str, password: str):
             status_code=503, detail="The database has crashed, try again later"
         )
     real_user_data = json.loads(raw_user_data)
-    
+
     if not pwd_context.verify(password, real_user_data["oauth_key"]):
         logger.warning("Invalid login attempt")
         raise HTTPException(status_code=401, detail="Wrong Username or Password")
 
     return old_uuid
+
+
+async def blacklist_cookie(cookie):
+    await redis_client.set(f"blacklist:{cookie}", "true", ex=DAY_IN_SEC)

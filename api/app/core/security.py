@@ -4,6 +4,7 @@ from passlib.context import CryptContext
 import jwt
 from app.core.logging import logger
 from app.core.config import DAY_IN_SEC
+from app.core.redis import redis_client
 
 
 def create_cookie(username: str):
@@ -21,6 +22,11 @@ async def verify_cookie(session: str = Cookie(None)):
     if not session:
         logger.warning("No login cookie")
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+    blacklisted = await redis_client.exists(f"blacklist:{session}")
+
+    if blacklisted:
+        raise HTTPException(status_code=401, detail="Session expired")
 
     try:
         payload = jwt.decode(session, secret_key, algorithms=[algorithm])

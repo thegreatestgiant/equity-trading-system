@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Request
 from app.core.logging import logger
 from app.core.security import create_cookie
 from app.core.config import DAY_IN_SEC
 from app.models.auth_models import RegisterRequest, LoginRequest
-from app.services.auth_services import register_valid_user, login_valid_user
+from app.services.auth_services import (
+    register_valid_user,
+    login_valid_user,
+    blacklist_cookie,
+)
 
 router = APIRouter(tags=["Login"])
 
@@ -49,8 +53,13 @@ async def login_user(request: LoginRequest, response: Response):
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(response: Response, request: Request):
     logger.info("Recieved new logout request")
+    cookie = request.cookies.get("session")
+
+    if cookie:
+        await blacklist_cookie(cookie)
+
     response.delete_cookie(key="session", httponly=True, samesite="lax")
 
     return {"message": "logged out"}

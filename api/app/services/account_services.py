@@ -37,7 +37,7 @@ async def create_new_account(account_name: str, can_short: bool, user_id: str):
     return account_id
 
 
-async def add_account_to_user(account_id: str, user_id: str):
+async def add_account_to_user(account_id: str, other_user: str, user_id: str):
     # Grab User to add account to them
     raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
     if raw_user is None:
@@ -46,18 +46,25 @@ async def add_account_to_user(account_id: str, user_id: str):
         )
     user_data = json.loads(raw_user)
 
-    # Get account to ensure it exists
-    raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
-    if not raw_account:
-        logger.warning("Invalid account given")
-        raise HTTPException(status_code=404, detail="This account does not exist")
+    if account_id not in user_data["accounts_associated"]:
+        logger.warning("Invalid account_id for user")
+        raise HTTPException(
+            status_code=401, detail="You do not have access to this account"
+        )
 
-    user_data["accounts_associated"].append(account_id)
-    user_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    other_uuid = await redis_client.hget(redis_dictionaries[3], other_user)
 
-    await redis_client.hset(redis_dictionaries[0], user_id, json.dumps(user_data))
-
-    return user_data["username"]
+    if other_uuid is None:
+        logger.warning("User does not exist")
+        raise HTTPException(status_code=401, detail="The requested user does not exist")
+    else:
+        raw_other_data = await redis_client.hget(redis_dictionaries[0], other_uuid)
+        other_data = json.loads(raw_other_data)
+        other_data["accounts_associated"].append(account_id)
+        other_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await redis_client.hset(
+            redis_dictionaries[0], other_uuid, json.dumps(other_data)
+        )
 
 
 async def change_account_short_perms(

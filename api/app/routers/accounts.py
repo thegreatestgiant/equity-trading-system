@@ -23,13 +23,15 @@ async def create_account(
     return {"message": "Account created", "account_id": f"{account_id}"}
 
 
-@router.post("/users/add_account/{account_id}")
-async def add_account(account_id: str, user_id: str = Depends(verify_cookie)):
+@router.post("/users/send_account_to_other/{account_id}")
+async def add_account(
+    account_id: str, other_user: str, user_id: str = Depends(verify_cookie)
+):
     logger.info("Recieved new account sync to user request")
 
-    username = await add_account_to_user(account_id, user_id)
+    await add_account_to_user(account_id, other_user, user_id)
 
-    return {"message": f"Account added to user {username}"}
+    return {"message": f"Account added to user {other_user}"}
 
 
 @router.patch("/users/update_account_details/{account_id}")
