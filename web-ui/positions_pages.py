@@ -106,23 +106,37 @@ def _render_positions_result(result, empty_message="No positions found.", accoun
 def _all_positions_fragment():
     account_id = st.session_state.get("positions_account_filter")
     ticker = st.session_state.get("positions_ticker_filter")
+
     if not account_id and not ticker:
+        result = get_all_positions()
+        if result["status"] != "success":
+            st.error(result["message"])
+            return
+        rows = flatten_positions(result["data"])
+        rows = sorted(
+            [r for r in rows if r.get("Total Value") is not None],
+            key=lambda r: r["Total Value"],
+            reverse=True,
+        )
+        if not rows:
+            st.info("No positions found.")
+            return
+        st.caption("All positions sorted by total value — filter above to narrow down.")
+        render_positions_grid(rows, empty_message="No positions found.", key="all_positions_grid")
         return
+
     if account_id and ticker:
         result = get_positions_by_account_and_ticker(account_id, ticker)
     elif account_id:
         result = get_positions_by_account(account_id)
     else:
         result = get_positions_by_ticker(ticker)
+
     if result["status"] != "success":
         st.error(result["message"])
         return
-    rows = flatten_positions(result["data"])
-    render_positions_grid(
-        rows,
-        empty_message="No positions found.",
-        key="all_positions_grid",
-    )
+    rows = flatten_positions(result["data"], account_id=account_id)
+    render_positions_grid(rows, empty_message="No positions found.", key="all_positions_grid")
 
 
 def render_all_positions_page():
@@ -136,7 +150,4 @@ def render_all_positions_page():
         ticker = st.text_input("Ticker (optional)", key="pos_page_filter_ticker").strip().upper() or None
     st.session_state["positions_account_filter"] = account_id
     st.session_state["positions_ticker_filter"] = ticker
-    if not account_id and not ticker:
-        st.info("Select an account or enter a ticker to load positions.")
-        return
     _all_positions_fragment()

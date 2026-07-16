@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import urllib.parse
 
 import streamlit as st
@@ -80,38 +81,25 @@ def init_auth():
             st.session_state.saved_session_cookie = cookie_session
             st.session_state.session_validated = False
 
-    # If we have cookies but haven't validated the session in this streamlit instance yet
-    if get_session_cookie() and get_username():
-        if not st.session_state.get("session_validated"):
-            from api_client import get_user_accounts
-            
-            # An actual invalid/expired token is already handled inside
-            # get_user_accounts() -> _api_error(), which calls
-            # forget_login() and redirects on a real 401. So a non-success
-            # result here only ever means "couldn't confirm the session
-            # right now" (backend restarting, a network blip, etc.) --
-            # NOT "the session is invalid". Don't log the user out for
-            # that; just leave the cookies alone and retry on the next
-            # rerun.
-            res = get_user_accounts()
-            
-            if res.get("status") == "success":
-                st.session_state.session_validated = True
-    else:
+    if not get_session_cookie() or not get_username():
         st.session_state.username = None
         st.session_state.saved_session_cookie = None
 
-def render_user_sidebar(pages=None):
+def render_user_sidebar(sections=None):
     username = get_username()
     if username:
-        for p in (pages or []):
-            st.sidebar.page_link(p)
+        for title, pages in (sections or []):
+            st.sidebar.caption(title.upper())
+            for p in pages:
+                st.sidebar.page_link(p)
+            st.sidebar.markdown("")
         st.sidebar.divider()
         st.sidebar.markdown(f"👤 **{username}**")
         if st.sidebar.button("🚪 Log Out", use_container_width=True):
             from api_client import logout
             logout()
             forget_login()
+            time.sleep(0.5)
             st.rerun()
 
 def require_auth():

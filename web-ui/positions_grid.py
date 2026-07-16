@@ -36,7 +36,7 @@ def _position_row(position, account_id=None):
     }
 
 
-def flatten_positions(data):
+def flatten_positions(data, account_id=None):
     """STEP 1: Takes the raw 'data' value from any positions endpoint
     result and returns a flat list of row dicts, one per position,
     regardless of which shape the backend used.
@@ -52,7 +52,7 @@ def flatten_positions(data):
         return []
 
     if isinstance(data, list):
-        return [_position_row(p) for p in data]
+        return [_position_row(p, account_id=account_id) for p in data]
 
     if isinstance(data, dict) and "symbol_ticker" in data:
         return [_position_row(data)]

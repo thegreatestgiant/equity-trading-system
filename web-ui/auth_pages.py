@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 
 from api_client import login, register
@@ -24,6 +26,7 @@ def render_login_page():
         result = login(username, password)
         if result["status"] == "success":
             auth_state.remember_login(username, result["session_cookie"])
+            time.sleep(0.5)
             st.session_state.redirect_to = "pages/my_accounts.py"
             st.rerun()
         else:
