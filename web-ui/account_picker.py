@@ -81,6 +81,8 @@ def account_select(label="Account", preselect_account_id=None, key=None):
             (lbl for lbl, aid in label_to_id.items() if aid == preselect_account_id),
             None,
         )
+        if default_label and key:
+            st.session_state[key] = default_label
 
     default_index = options.index(default_label) if default_label in options else 0
     selected_label = st.selectbox(label, options, index=default_index, key=key)

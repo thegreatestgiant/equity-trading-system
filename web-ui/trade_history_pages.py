@@ -101,6 +101,14 @@ def render_update_trade_page():
     st.header("✏️ Edit Trade", anchor=False)
     st.caption("PATCH /edit_trade/{trade_id}")
 
+    # Auto-load if navigated here with a pre-filled trade ID
+    if "editing_trade_id" in st.session_state and not st.session_state.get("editing_trade_data"):
+        result = get_trade_by_id(st.session_state.editing_trade_id)
+        if result["status"] == "success" and result["data"]:
+            st.session_state.editing_trade_data = result["data"]
+        else:
+            st.error(result.get("message", "Trade not found."))
+
     with st.form("load_trade_for_edit_form"):
         trade_id_input = st.text_input(
             "Trade ID", value=st.session_state.get("editing_trade_id", "")
@@ -164,6 +172,7 @@ def render_update_trade_page():
 
         if result["status"] == "success":
             st.success(f"Trade `{st.session_state.editing_trade_id}` updated successfully.")
-            st.session_state.editing_trade_data = None
+            st.session_state.pop("editing_trade_id", None)
+            st.session_state.pop("editing_trade_data", None)
         else:
             st.error(result["message"])

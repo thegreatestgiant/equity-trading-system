@@ -122,6 +122,7 @@ def _render_preview_grid(rows: list[dict]):
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(sortable=True, resizable=True)
     gb.configure_pagination(paginationAutoPageSize=True)
+    gb.configure_grid_options(enableCellTextSelection=True)
 
     # Color rows red/green based on Status column content
     row_style = JsCode("""
@@ -268,12 +269,43 @@ def _render_success_state():
     successes = data.get("successes", []) if isinstance(data, dict) else []
     failures = data.get("failures", []) if isinstance(data, dict) else []
 
-    col1, col2, _ = st.columns([1, 1, 3])
-    if col1.button("📋 Book More Trades", type="primary"):
-        _reset_mass_trade_state()
-        st.rerun()
-    if col2.button("📜 View Trades", type="primary"):
-        st.switch_page("pages/trade_history.py")
+    with st.container(key="mass_trade_success_buttons"):
+        st.markdown(
+            """
+            <style>
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(1) button {
+                background-color: #28a745; border-color: #28a745; color: white; width: 100%;
+            }
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(1) button:hover {
+                background-color: #218838; border-color: #1e7e34;
+            }
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(2) button {
+                background-color: #007bff; border-color: #007bff; color: white; width: 100%;
+            }
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(2) button:hover {
+                background-color: #0069d9; border-color: #0062cc;
+            }
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(3) button {
+                background-color: #6f42c1; border-color: #6f42c1; color: white; width: 100%;
+            }
+            .st-key-mass_trade_success_buttons div[data-testid="column"]:nth-child(3) button:hover {
+                background-color: #5a32a3; border-color: #542c98;
+            }
+            </style>
+            """, unsafe_allow_html=True
+        )
+        col1, col2, col3, _ = st.columns([1.5, 1.5, 1.5, 7.5])
+        if col1.button("📋 Book More Trades"):
+            _reset_mass_trade_state()
+            st.rerun()
+        if col2.button("📊 View Positions"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_account = payload[0]["account_id"]
+            st.switch_page("pages/positions.py")
+        if col3.button("📜 View Trades"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_trades_account = payload[0]["account_id"]
+            st.switch_page("pages/trade_history.py")
 
     if failures:
         st.warning(

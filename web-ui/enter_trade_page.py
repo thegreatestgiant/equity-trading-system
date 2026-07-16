@@ -11,15 +11,16 @@ def render_enter_trade_page():
     # Initialize trade queue and review mode in session state
     if "trade_queue" not in st.session_state:
         st.session_state.trade_queue = []
-    if "reviewing" not in st.session_state:
-        st.session_state.reviewing = False
     if "editing_trade_index" not in st.session_state:
         st.session_state.editing_trade_index = None
     if "last_submission_result" not in st.session_state:
         st.session_state.last_submission_result = None
 
-    if st.session_state.reviewing:
-        _render_review_step()
+    if "jump_to_trade_account" in st.session_state:
+        st.session_state.last_submission_result = None
+
+    if st.session_state.get("last_submission_result"):
+        _render_post_submission_state()
     else:
         _render_builder_step()
 
@@ -35,53 +36,12 @@ def _trade_row(trade, key_prefix, index):
         cols[3].write(f"${trade['price']}")
         if cols[4].button("✏️", key=f"{key_prefix}_edit_{index}", help="Edit this trade"):
             st.session_state.editing_trade_index = index
-            st.session_state.reviewing = False
             st.rerun()
         if cols[5].button("✕", key=f"{key_prefix}_remove_{index}", help="Remove this trade"):
             st.session_state.trade_queue.pop(index)
             if st.session_state.editing_trade_index == index:
                 st.session_state.editing_trade_index = None
             st.rerun()
-
-
-def _render_review_step():
-    # If a submission just succeeded, show only the success state --
-    # don't keep rendering the stale Review Trades cards/Submit button
-    # underneath it.
-    if st.session_state.get("last_submission_result"):
-        _render_post_submission_state()
-        return
-
-    st.subheader("Review Trades", anchor=False)
-
-    for i, trade in enumerate(st.session_state.trade_queue):
-        _trade_row(trade, "review", i)
-
-    st.divider()
-    col_back, col_submit = st.columns([1, 1])
-
-    if col_back.button("← Back"):
-        st.session_state.reviewing = False
-        st.rerun()
-
-    if col_submit.button("Submit All", type="primary"):
-        # Attach user_id to each trade and send as a single array
-        payload = [
-            {**trade, "user_id": st.session_state.username}
-            for trade in st.session_state.trade_queue
-        ]
-
-        result = submit_trades(payload)
-
-        if result["status"] == "success":
-            # Stash the result so the post-submission state can render
-            # it, then clear the queue. Don't reset "reviewing" yet --
-            # that happens when the user clicks "Book More Trades".
-            st.session_state.last_submission_result = (payload, result["data"])
-            st.session_state.trade_queue = []
-            st.rerun()
-        else:
-            st.error(f"Submission failed: {result['message']}")
 
 
 def _render_post_submission_state():
@@ -103,11 +63,44 @@ def _render_post_submission_state():
     _render_submission_results(successes, failures)
 
     st.divider()
-    if st.button("➕ Book More Trades", type="primary"):
-        st.session_state.last_submission_result = None
-        st.session_state.reviewing = False
-        st.session_state.editing_trade_index = None
-        st.rerun()
+    with st.container(key="enter_trade_success_buttons"):
+        st.markdown(
+            """
+            <style>
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(1) button {
+                background-color: #28a745; border-color: #28a745; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(1) button:hover {
+                background-color: #218838; border-color: #1e7e34;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(2) button {
+                background-color: #007bff; border-color: #007bff; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(2) button:hover {
+                background-color: #0069d9; border-color: #0062cc;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(3) button {
+                background-color: #6f42c1; border-color: #6f42c1; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(3) button:hover {
+                background-color: #5a32a3; border-color: #542c98;
+            }
+            </style>
+            """, unsafe_allow_html=True
+        )
+        col1, col2, col3, _ = st.columns([1.5, 1.5, 1.5, 7.5])
+        if col1.button("➕ Book More Trades"):
+            st.session_state.last_submission_result = None
+            st.session_state.editing_trade_index = None
+            st.rerun()
+        if col2.button("📊 View Positions"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_account = payload[0]["account_id"]
+            st.switch_page("pages/positions.py")
+        if col3.button("💸 View Trades"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_trades_account = payload[0]["account_id"]
+            st.switch_page("pages/trade_history.py")
 
 
 def _render_submission_results(successes, failures):
@@ -124,7 +117,11 @@ def _render_submission_results(successes, failures):
         with st.container(border=True):
             st.markdown("✅ **Trade booked**")
             if trade_id:
-                st.caption(f"Trade ID: `{trade_id}`")
+                col_tid, col_edit = st.columns([10, 1])
+                col_tid.caption(f"Trade ID: `{trade_id}`")
+                if col_edit.button("✏️", key=f"edit_booked_{trade_id}", help="Edit Trade"):
+                    st.session_state.editing_trade_id = trade_id
+                    st.switch_page("pages/edit_trade.py")
 
     for entry in failures:
         reason = (
@@ -144,21 +141,10 @@ def _render_builder_step():
         else None
     )
 
-    # Show queued trades so far (skip the one currently being edited so
-    # it doesn't look duplicated while it's loaded into the form below)
-    other_trades = [
-        (i, t) for i, t in enumerate(st.session_state.trade_queue) if i != editing_index
-    ]
-    if other_trades:
-        st.subheader("Queued Trades", anchor=False)
-        for i, trade in other_trades:
-            _trade_row(trade, "queue", i)
-        st.divider()
-
     # Add / Edit trade form
     st.subheader("Edit Trade" if editing_trade else "Add Trade", anchor=False)
 
-    with st.form("trade_builder_form"):
+    with st.form("trade_builder_form", clear_on_submit=True):
         prefilled_account = st.session_state.pop("jump_to_trade_account", None)
         preselect = editing_trade["account_id"] if editing_trade else prefilled_account
         account_id = account_select(preselect_account_id=preselect, key="enter_trade_account_select")
@@ -176,7 +162,7 @@ def _render_builder_step():
             value=int(editing_trade["quantity"]) if editing_trade else 1,
         )
         price = st.number_input(
-            "Price", min_value=0.01,
+            "Price", min_value=0.01, step=0.01,
             value=float(editing_trade["price"]) if editing_trade else 0.01,
         )
         other_account = st.text_input(
@@ -195,9 +181,9 @@ def _render_builder_step():
             }
 
         if editing_trade:
-            col_save, col_cancel = st.columns([1, 1])
-            save_clicked = col_save.form_submit_button("💾 Save Changes", type="primary")
-            cancel_clicked = col_cancel.form_submit_button("Cancel")
+            col_save, col_cancel = st.columns(2)
+            save_clicked = col_save.form_submit_button("💾 Save Changes", type="primary", use_container_width=True)
+            cancel_clicked = col_cancel.form_submit_button("Cancel", use_container_width=True)
             
             if save_clicked:
                 if not account_id or not ticker:
@@ -210,21 +196,62 @@ def _render_builder_step():
                 st.session_state.editing_trade_index = None
                 st.rerun()
         else:
-            col_add, col_review = st.columns([1, 1])
-            add_clicked = col_add.form_submit_button("＋ Add Trade")
-            review_clicked = col_review.form_submit_button("Review & Submit →", type="primary")
+            col_add, col_submit, col_cancel = st.columns(3)
+            add_clicked = col_add.form_submit_button("＋ Add to Queue", type="primary", use_container_width=True)
+            submit_clicked = col_submit.form_submit_button("🚀 Queue & Submit", type="primary", use_container_width=True)
+            cancel_clicked = col_cancel.form_submit_button("Clear Form", use_container_width=True)
 
-            if add_clicked:
+            if add_clicked or submit_clicked:
                 if not account_id or not ticker:
                     st.error("Account and Ticker are required.")
                 else:
-                    st.session_state.trade_queue.append(_build_trade())
-                    st.session_state.last_added_trade = _build_trade()
+                    trade = _build_trade()
+                    st.session_state.trade_queue.append(trade)
+                    if submit_clicked:
+                        payload = [
+                            {**t, "user_id": st.session_state.username}
+                            for t in st.session_state.trade_queue
+                        ]
+                        result = submit_trades(payload)
+                        if result["status"] == "success":
+                            st.session_state.last_submission_result = (payload, result["data"])
+                            st.session_state.trade_queue = []
+                        else:
+                            st.error(f"Submission failed: {result['message']}")
                     st.rerun()
 
-            if review_clicked:
-                current = _build_trade() if (account_id and ticker) else None
-                if current is not None and current != st.session_state.get("last_added_trade"):
-                    st.session_state.trade_queue.append(current)
-                st.session_state.reviewing = True
+            if cancel_clicked:
+                # Just rerun, which resets to defaults because we don't save anything new
                 st.rerun()
+
+    # Show queued trades so far
+    other_trades = [
+        (i, t) for i, t in enumerate(st.session_state.trade_queue) if i != editing_index
+    ]
+    
+    if other_trades:
+        st.divider()
+        st.subheader("Queued Trades", anchor=False)
+        for i, trade in other_trades:
+            _trade_row(trade, "queue", i)
+            
+        st.divider()
+        col_submit, col_cancel_all = st.columns([1, 1])
+        if col_submit.button("Submit All Queued Trades", type="primary"):
+            payload = [
+                {**trade, "user_id": st.session_state.username}
+                for trade in st.session_state.trade_queue
+            ]
+            result = submit_trades(payload)
+
+            if result["status"] == "success":
+                st.session_state.last_submission_result = (payload, result["data"])
+                st.session_state.trade_queue = []
+                st.rerun()
+            else:
+                st.error(f"Submission failed: {result['message']}")
+                
+        if col_cancel_all.button("Clear Queue"):
+            st.session_state.trade_queue = []
+            st.session_state.editing_trade_index = None
+            st.rerun()

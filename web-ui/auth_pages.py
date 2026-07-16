@@ -18,8 +18,8 @@ def render_auth_sidebar():
 
 def render_login_page():
     with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        username = st.text_input("Username", autocomplete="username")
+        password = st.text_input("Password", type="password", autocomplete="current-password")
         submitted = st.form_submit_button("Login")
 
     if submitted:
@@ -38,8 +38,8 @@ def render_login_page():
 
 def render_register_page():
     with st.form("register_form"):
-        username = st.text_input("New Username")
-        password = st.text_input("New Password", type="password")
+        username = st.text_input("New Username", autocomplete="username")
+        password = st.text_input("New Password", type="password", autocomplete="new-password")
         submitted = st.form_submit_button("Register")
 
     if submitted:
