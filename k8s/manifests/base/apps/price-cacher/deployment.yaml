@@ -25,8 +25,8 @@ spec:
               echo "{\"message\":\"Waiting for Loki and Redis...\"}"
               until nc -z loki-stack.monitoring.svc.cluster.local 3100 && \
                     redis-cli -h redis-proxy.data.svc.cluster.local PING | grep -q PONG; do
-                echo "{\"message\":\"Infrastructure not ready. Sleeping 2 seconds...\"}"
-                sleep 2
+                echo "{\"message\":\"Infrastructure not ready. Sleeping 5 seconds...\"}"
+                sleep 5
               done
               echo "{\"message\":\"Infrastructure is online! Proceeding with price-cacher startup.\"}"
       containers:

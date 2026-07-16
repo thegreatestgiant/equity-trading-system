@@ -21,6 +21,16 @@ spec:
             - type: Percent
               value: 100
               periodSeconds: 15
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 15
+            - type: Percent
+              value: 25
+              periodSeconds: 15
+          selectPolicy: Max
   triggers:
     - type: cpu
       metricType: Utilization
@@ -34,7 +44,7 @@ spec:
       metadata:
         # Be sure this exactly matches the DNS name of your Prometheus service
         serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
-        metricName: fastapi_internal_rps
-        threshold: "60"
+        metricName: fastapi_concurrency
+        threshold: "5"
         query: |
-          sum(rate(http_requests_total[1m]))
+          sum(rate(http_request_duration_seconds_sum[1m]))

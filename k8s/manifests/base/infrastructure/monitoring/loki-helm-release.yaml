@@ -34,10 +34,7 @@ spec:
             gnetId: 1860
             revision: 37
             datasource: Prometheus
-          k8s-cluster-summary:
-            gnetId: 3119
-            revision: 4
-            datasource: Prometheus
+
 
       dashboardProviders:
         dashboardproviders.yaml:
@@ -63,7 +60,7 @@ spec:
                 path: /var/lib/grafana/dashboards/default
       grafana.ini:
         dashboards:
-          default_home_dashboard_path: /tmp/dashboards/Custom_Dashboards/custom-dashboard.json
+          default_home_dashboard_path: /tmp/dashboards/custom-dashboard.json
 
       sidecar:
         dashboards:

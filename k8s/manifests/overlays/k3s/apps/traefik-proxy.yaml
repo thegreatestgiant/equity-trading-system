@@ -1,0 +1,38 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik-proxy
+  namespace: frontend
+  labels:
+    app: traefik-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik-proxy
+  template:
+    metadata:
+      labels:
+        app: traefik-proxy
+    spec:
+      containers:
+        - name: socat
+          image: alpine/socat:latest
+          args:
+            - tcp-listen:80,fork,reuseaddr
+            - tcp-connect:traefik.kube-system.svc.cluster.local:80
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-proxy
+  namespace: frontend
+spec:
+  selector:
+    app: traefik-proxy
+  ports:
+    - port: 80
+      targetPort: 80

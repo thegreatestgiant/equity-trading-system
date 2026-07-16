@@ -368,7 +368,7 @@
           "id": 301,
           "title": "Trade Writer Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 8, "x": 0, "y": 3 },
+          "gridPos": { "h": 12, "w": 6, "x": 0, "y": 3 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -387,7 +387,7 @@
           "id": 401,
           "title": "DB Syncer Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 8, "x": 8, "y": 3 },
+          "gridPos": { "h": 12, "w": 6, "x": 6, "y": 3 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -409,7 +409,7 @@
           "id": 402,
           "title": "Price Cacher Logs",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 8, "x": 16, "y": 3 },
+          "gridPos": { "h": 12, "w": 6, "x": 12, "y": 3 },
           "options": {
             "showTime": true,
             "sortOrder": "Ascending",
@@ -423,6 +423,28 @@
                 "uid": "Loki"
               },
               "expr": "{app=\"price-cacher\"} | json | __error__=\"\" | (_module_path =~ \"price_cacher|helpers\") or (level !~ \"(?i)debug\") | line_format \"{{.message}}\"",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 403,
+          "title": "Redis Populator Logs (Usually Empty)",
+          "type": "logs",
+          "gridPos": { "h": 12, "w": 6, "x": 18, "y": 3 },
+          "options": {
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "expr": "{app=\"redis-populator\"} | json | __error__=\"\" | (_module_path =~ \"redis_populator|helpers\") or (level !~ \"(?i)debug\") | line_format \"{{.message}}\"",
               "refId": "A"
             }
           ]

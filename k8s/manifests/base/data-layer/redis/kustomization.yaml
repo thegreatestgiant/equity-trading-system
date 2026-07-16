@@ -5,8 +5,5 @@ kind: Kustomization
 namespace: data
 
 resources:
-  # - service.yaml
-  # - config.yaml
-  # - state.yaml
   - helm-repo.yaml
   - helm-release.yaml

@@ -36,15 +36,18 @@ async fn run() -> Result<()> {
 
     loop {
         debug!("starting sync cycle");
-        if let Err(err) = sync_users(&pg_client, &mut redis_conn).await {
-            helpers::fatal("user sync failed", err).await;
-        }
-        if let Err(err) = sync_accounts(&pg_client, &mut redis_conn).await {
-            helpers::fatal("account sync failed", err).await;
-        }
-        if let Err(err) = sync_positions(&pg_client, &mut redis_conn).await {
-            helpers::fatal("position sync failed", err).await;
-        }
+        sync_users(&pg_client, &mut redis_conn)
+            .await
+            .context("user sync failed")?;
+        sync_accounts(&pg_client, &mut redis_conn)
+            .await
+            .context("account sync failed")?;
+        sync_positions(&pg_client, &mut redis_conn)
+            .await
+            .context("position sync failed")?;
+        sync_usernames(&pg_client, &mut redis_conn)
+            .await
+            .context("username sync failed")?;
         info!("sync cycle complete");
 
         debug!(sync_interval, "sleeping until next sync cycle");
@@ -226,15 +229,6 @@ async fn sync_json_hash_table<T>(
     Ok(())
 }
 
-#[derive(serde::Deserialize)]
-struct User {
-    username: String,
-    oauth_key: String,
-    accounts_associated: Vec<String>,
-    created_at: String,
-    updated_at: String,
-}
-
 async fn sync_users(
     pg_client: &tokio_postgres::Client,
     redis_conn: &mut redis::aio::MultiplexedConnection,
@@ -250,7 +244,7 @@ async fn sync_users(
             copy_columns: "user_id, username, oauth_key, accounts_associated, created_at, updated_at",
             conflict_column: "user_id",
             update_assignments: "username = EXCLUDED.username,\n    oauth_key = EXCLUDED.oauth_key,\n    accounts_associated = EXCLUDED.accounts_associated,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<User>("user", id, json),
+            parse_row: |id, json| parse_json_row::<helpers::User>("user", id, json),
             format_row: |id, data| {
                 format!(
                     "{}\t{}\t{}\t{}\t{}\t{}",
@@ -265,15 +259,6 @@ async fn sync_users(
         },
     )
     .await
-}
-
-#[derive(serde::Deserialize)]
-struct Account {
-    account_name: String,
-    positions: Vec<String>,
-    can_short: bool,
-    created_at: String,
-    updated_at: String,
 }
 
 async fn sync_accounts(
@@ -291,7 +276,7 @@ async fn sync_accounts(
             copy_columns: "account_id, account_name, positions, can_short, created_at, updated_at",
             conflict_column: "account_id",
             update_assignments: "account_name = EXCLUDED.account_name,\n    positions = EXCLUDED.positions,\n    can_short = EXCLUDED.can_short,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<Account>("account", id, json),
+            parse_row: |id, json| parse_json_row::<helpers::Account>("account", id, json),
             format_row: |id, data| {
                 format!(
                     "{}\t{}\t{}\t{}\t{}\t{}",
@@ -308,15 +293,6 @@ async fn sync_accounts(
     .await
 }
 
-#[derive(serde::Deserialize)]
-struct Position {
-    account_id: String,
-    symbol_ticker: String,
-    quantity: i32,
-    created_at: String,
-    updated_at: String,
-}
-
 async fn sync_positions(
     pg_client: &tokio_postgres::Client,
     redis_conn: &mut redis::aio::MultiplexedConnection,
@@ -329,17 +305,19 @@ async fn sync_positions(
             redis_key: "positions",
             staging_table_name: "positions_sync_stage",
             target_table_name: "positions",
-            copy_columns: "position_id, account_id, symbol_ticker, quantity, created_at, updated_at",
+            copy_columns: "position_id, account_id, symbol_ticker, quantity, average_cost, total_realized_gains, created_at, updated_at",
             conflict_column: "position_id",
-            update_assignments: "quantity = EXCLUDED.quantity,\n    updated_at = EXCLUDED.updated_at",
-            parse_row: |id, json| parse_json_row::<Position>("position", id, json),
+            update_assignments: "quantity = EXCLUDED.quantity,\n    average_cost = EXCLUDED.average_cost,\n    total_realized_gains = EXCLUDED.total_realized_gains,\n    updated_at = EXCLUDED.updated_at",
+            parse_row: |id, json| parse_json_row::<helpers::Position>("position", id, json),
             format_row: |id, data| {
                 format!(
-                    "{}\t{}\t{}\t{}\t{}\t{}",
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     id,
                     data.account_id,
                     data.symbol_ticker,
                     data.quantity,
+                    to_pg_optional_numeric(data.average_cost),
+                    to_pg_optional_numeric(data.total_realized_gains),
                     data.created_at,
                     data.updated_at,
                 )
@@ -347,6 +325,36 @@ async fn sync_positions(
         },
     )
     .await
+}
+
+async fn sync_usernames(
+    pg_client: &tokio_postgres::Client,
+    redis_conn: &mut redis::aio::MultiplexedConnection,
+) -> Result<()> {
+    sync_json_hash_table(
+        pg_client,
+        redis_conn,
+        JsonHashTableSyncSpec {
+            entity_name: "usernames",
+            redis_key: "username",
+            staging_table_name: "username_sync_stage",
+            target_table_name: "username",
+            copy_columns: "username, user_id",
+            conflict_column: "username",
+            update_assignments: "user_id = EXCLUDED.user_id",
+            // the redis value is a bare uuid string, not JSON — pass it through.
+            parse_row: |_username, user_id| Ok(user_id.to_string()),
+            format_row: |username, user_id| format!("{}\t{}", username, user_id),
+        },
+    )
+    .await
+}
+
+fn to_pg_optional_numeric(value: Option<f64>) -> String {
+    match value {
+        Some(v) => v.to_string(),
+        None => "\\N".to_string(),
+    }
 }
 
 fn to_pg_text_array_literal(values: &[String]) -> String {

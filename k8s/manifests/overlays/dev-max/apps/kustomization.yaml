@@ -16,6 +16,7 @@ images:
   #   newName: ghcr.io/yscohen/trade-writer
 
 patches:
+  - path: fastapi-deployment-patch.yaml # This is what you named your file
   - target:
       kind: Deployment
       name: fastapi-api
@@ -32,15 +33,53 @@ patches:
                 env:
                   - name: ENVIRONMENT
                     value: "dev-max"
+  # - target:
+  #     kind: ScaledObject
+  #     name: fastapi-scaler
+  #     namespace: backend
+  #   patch: |-
+  #     - op: replace
+  #       # Targets the 3rd trigger (index 2: cpu=0, memory=1, prometheus=2)
+  #       path: /spec/triggers/2/metadata/threshold
+  #       value: "30"
+  #     - op: replace
+  #       path: /spec/advanced/horizontalPodAutoscalerConfig/behavior/scaleDown/stabilizationWindowSeconds
+  #       # Reduced seconds for faster local testing
+  #       value: 300
+  #     - op: add
+  #       path: /spec/maxReplicaCount
+  #       value: 40
+  #     - op: add
+  #       path: /spec/minReplicaCount
+  #       value: 10
   - target:
       kind: ScaledObject
       name: fastapi-scaler
       namespace: backend
     patch: |-
       - op: replace
-        # Targets the 3rd trigger (index 2: cpu=0, memory=1, prometheus=2)
-        path: /spec/triggers/2/metadata/threshold
-        value: "40"
+        path: /spec/triggers
+        value:
+          # =====================================================================
+          # MAX: Use Concurrency (Little's Law) instead of RPS for scaling!
+          # =====================================================================
+          # Why? If we scale on RPS (http_requests_total), we risk an autoscaling
+          # death spiral. When the DB gets slow, latency spikes, so total RPS drops.
+          # If RPS drops, HPA scales down, making the bottleneck worse!
+          
+          # Instead, we scale on active, in-flight requests (Concurrency).
+          # Concurrency = RPS * Latency (Little's Law). 
+          # If the DB gets slow, requests pile up inside the pod, so concurrency
+          # skyrockets. This forces HPA to safely scale UP to rescue the system!
+          # =====================================================================
+          - type: prometheus
+            metadata:
+              serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
+              metricName: fastapi_concurrency
+              # Target 15 active requests in-flight per pod before scaling up
+              threshold: "15"
+              query: |
+                sum(rate(http_request_duration_seconds_sum[1m]))
       - op: replace
         path: /spec/advanced/horizontalPodAutoscalerConfig/behavior/scaleDown/stabilizationWindowSeconds
         # Reduced seconds for faster local testing
@@ -51,28 +90,3 @@ patches:
       - op: add
         path: /spec/minReplicaCount
         value: 10
-  # - target:
-  #     kind: ScaledObject
-  #     name: fastapi-scaler
-  #     namespace: backend
-  #   patch: |-
-  #     - op: replace
-  #       path: /spec/triggers
-  #       value:
-  #         - type: prometheus
-  #           metadata:
-  #             serverAddress: http://loki-stack-prometheus-server.monitoring.svc.cluster.local
-  #             metricName: fastapi_internal_rps
-  #             threshold: "100"
-  #             query: |
-  #               sum(rate(http_requests_total[1m]))
-  #     - op: replace
-  #       path: /spec/advanced/horizontalPodAutoscalerConfig/behavior/scaleDown/stabilizationWindowSeconds
-  #       # Reduced seconds for faster local testing
-  #       value: 300
-  #     - op: add
-  #       path: /spec/maxReplicaCount
-  #       value: 20
-  #     - op: add
-  #       path: /spec/minReplicaCount
-  #       value: 10

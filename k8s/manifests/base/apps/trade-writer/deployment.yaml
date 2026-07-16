@@ -27,8 +27,8 @@ spec:
               until redis-cli -h redis-proxy.data.svc.cluster.local PING | grep -q PONG && \
                     nc -z trading-pooler.data.svc.cluster.local 5432 && \
                     nc -z loki-stack.monitoring.svc.cluster.local 3100; do
-                echo "{\"message\":\"Infrastructure not ready. Sleeping 1 second...\"}"
-                sleep 1
+                echo "{\"message\":\"Infrastructure not ready. Sleeping 5 seconds...\"}"
+                sleep 5
               done
               echo "{\"message\":\"All infrastructure online! Booting trade-writer.\"}"
       containers:

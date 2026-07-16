@@ -3,10 +3,10 @@
 use anyhow::{Context, Result};
 use bytes::Bytes;
 use futures_util::SinkExt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::env;
 use tokio_postgres::{Client, CopyInSink, NoTls};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 use tracing_loki::url::Url;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -19,7 +19,7 @@ pub fn require_env(name: &str) -> Result<String> {
 ///
 /// Returns `!` so it can be used directly in a `match` arm
 pub async fn fatal(message: &str, err: impl std::fmt::Debug) -> ! {
-    error!(?err, message);
+    error!(message, ?err);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     std::process::exit(1);
 }
@@ -47,7 +47,7 @@ pub async fn connect_postgres(config: &str) -> Client {
     };
     tokio::spawn(async move {
         if let Err(err) = connection.await {
-            error!(?err, "postgres connection driver error");
+            fatal("postgres connection driver error", err).await;
         }
     });
     debug!("connected to postgres");
@@ -131,6 +131,40 @@ pub async fn shutdown_signal() {
     }
 }
 
+// domain models mirrored between the redis hashes and postgres tables.
+// `db-syncer` deserializes these from redis JSON to write into postgres,
+// `redis-populator` serializes them back to redis JSON from postgres.
+#[derive(Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+    pub oauth_key: String,
+    pub accounts_associated: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Account {
+    pub account_name: String,
+    pub positions: Vec<String>,
+    pub can_short: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Position {
+    pub account_id: String,
+    pub symbol_ticker: String,
+    pub quantity: i32,
+    #[serde(default)] // use default so won't fail until API add these fields
+    pub average_cost: Option<f64>,
+    #[serde(default)]
+    pub total_realized_gains: Option<f64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct Record {
     #[serde(rename = "Symbol")]
@@ -156,6 +190,12 @@ pub async fn fetch_sp500_symbols() -> Result<Vec<String>> {
         let formatted_symbol = record.symbol.replace('.', "-");
         trace!(symbol = %formatted_symbol, "parsed symbol");
         symbols.push(formatted_symbol);
+    }
+
+    if symbols.len() == 500 {
+        info!("fetched S&P 500 symbol list");
+    } else {
+        warn!("got {} symbols instead of 500", symbols.len());
     }
 
     Ok(symbols)

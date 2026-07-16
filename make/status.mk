@@ -1,4 +1,4 @@
-.PHONY: ks events status status-wide status-svc check-sync sync adminer-info status-images
+.PHONY: ks events status status-wide status-svc check-sync sync status-images
 
 # ==========================================
 # 📊 CLUSTER STATUS
@@ -10,15 +10,15 @@ events: ## ⚠️  Show recent cluster events sorted by time
 	@echo "⚠️  RECENT CLUSTER EVENTS:"
 	@$(DOCKER) exec k8s-toolbox bash -c 'kubectl get events --sort-by=".metadata.creationTimestamp" -A | tail -n 30'
 
-status: ## 🟢 CURRENT POD STATUS:
+status: ## 🟢 Show current pod status across all namespaces
 	@echo "🟢 CURRENT POD STATUS:"
 	@$(DOCKER) exec k8s-toolbox kubectl get pods -A
 
-status-wide: ## 🌐 WIDE POD OVERVIEW:
+status-wide: ## 🌐 Show pod status with node/IP details
 	@echo "🌐 WIDE POD OVERVIEW:"
 	@$(DOCKER) exec k8s-toolbox kubectl get pods -A -o wide
 
-status-svc: ## 🔌 ACTIVE NETWORK SERVICES:
+status-svc: ## 🔌 Show active network services
 	@echo "🔌 ACTIVE NETWORK SERVICES:"
 	@$(DOCKER) exec k8s-toolbox kubectl get svc -A
 
@@ -45,14 +45,6 @@ sync: ## Force Flux to reconcile (Accepts LAYER=all, apps, or data-layer)
 		$(DOCKER) exec k8s-toolbox flux reconcile kustomization 2-data --with-source; \
 	fi
 
-adminer-info: ## 🌐 Adminer UI: http://adminer.localhost:8080
-	@echo "🌐 Adminer UI: http://adminer.localhost:8080"
-	@echo "🔍 Fetching Postgres Credentials from cluster..."
-	@echo -n "User: "
-	@$(DOCKER) exec k8s-toolbox kubectl get secret db-credentials -n data -o jsonpath='{.data.POSTGRES_USER}' | base64 -d; echo ""
-	@echo -n "Pass: "
-	@$(DOCKER) exec k8s-toolbox kubectl get secret db-credentials -n data -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d; echo ""
-
 status-images: ## 🏷️  Check the exact Docker images running for our custom apps
 	@echo "🏷️  CUSTOM APP IMAGE VERSIONS:"
-	@$(MAKE) --no-print-directory kubectl CMD="get pods -A -l 'app in (fastapi, streamlit, trade-writer, db-syncer, price-cacher)' -o custom-columns=NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image"
+	@$(MAKE) --no-print-directory kubectl CMD="get pods -A -l 'app in (fastapi, streamlit, trade-writer, db-syncer, price-cacher, redis-populator)' -o custom-columns=NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image"

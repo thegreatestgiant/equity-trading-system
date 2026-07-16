@@ -1,50 +1,35 @@
-.PHONY: bounce-api shell run kubectl shell-api shell-ui shell-postgres psql redis-cli redis-sentinel shell-pooler
-
-## ==========================================
-# 🕵️ DOWNWARD API & ENV DEBUGGING
-# ==========================================
-
-bounce-api: ## 3. Force a graceful restart of the FastAPI pods to pick up new Env Vars
-	@echo "🔄 Forcing a rolling restart of the FastAPI deployment..."
-	@$(DOCKER) exec k8s-toolbox kubectl rollout restart deployment/fastapi-api -n backend
+.PHONY: bounce
 
 # ==========================================
-# 🔍 INTERACTIVE SHELLS & DATABASES
+# 🔄 ROLLING RESTARTS (BOUNCING)
 # ==========================================
+BOUNCE_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher poolers
 
-shell: ## Opens an interactive Shell
-	$(DOCKER) exec -it k8s-toolbox bash
-
-run: ## Runs anything in CMD=""
-	@$(DOCKER) exec -it k8s-toolbox $(CMD)
-
-kubectl: ## Runs kubectl CMD=""
-	@$(DOCKER) exec -it k8s-toolbox kubectl $(CMD)
-
-shell-api: ## 🔌 Connecting to FastAPI backend...
-	@echo "🔌 Connecting to FastAPI backend..."
-	@$(DOCKER) exec -it k8s-toolbox kubectl exec -it deployment/fastapi-api -n backend -- /bin/sh
-
-shell-ui: ## 🔌 Connecting to Streamlit frontend...
-	@echo "🔌 Connecting to Streamlit frontend..."
-	@$(DOCKER) exec -it k8s-toolbox kubectl exec -it deployment/streamlit -n frontend -- /bin/sh
-
-shell-postgres: ## 🔌 Connecting to CNPG primary Postgres container...
-	@echo "🔌 Connecting to CNPG primary..."
-	@$(DOCKER) exec -it k8s-toolbox bash -c 'POD=$$(kubectl get pods -n data -l "cnpg.io/cluster=trading-db,cnpg.io/instanceRole=primary" -o jsonpath="{.items[0].metadata.name}"); kubectl exec -it $$POD -n data -- /bin/bash'
-
-psql: ## 🐘 Starting interactive PostgreSQL session...
-	@echo "🐘 Starting interactive PostgreSQL session..."
-	@$(DOCKER) exec -it k8s-toolbox bash -c 'POD=$$(kubectl get pods -n data -l "cnpg.io/cluster=trading-db,cnpg.io/instanceRole=primary" -o jsonpath="{.items[0].metadata.name}"); kubectl exec -it $$POD -n data -- psql -U trade_admin -d trading'
-
-shell-pooler: ## 🔌 Connecting to PgBouncer pooler container...
-	@echo "🔌 Connecting to PgBouncer pooler..."
-	@$(DOCKER) exec -it k8s-toolbox bash -c 'POD=$$(kubectl get pods -n data -l "cnpg.io/poolerName=trading-pooler" -o jsonpath="{.items[0].metadata.name}"); kubectl exec -it $$POD -n data -- /bin/bash'
-
-redis-cli: ## 🔴 Connecting to Redis CLI dynamically...
-	@echo "🔴 Finding active Redis node and launching CLI..."
-	@$(DOCKER) exec -it k8s-toolbox bash -c 'POD=$$(kubectl get pods -n data -l "app.kubernetes.io/name=redis" -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || kubectl get pods -n data -l "app=redis" -o jsonpath="{.items[0].metadata.name}"); kubectl exec -it $$POD -n data -- redis-cli'
-
-redis-sentinel: ## 🛡️ Connecting to Redis Sentinel CLI...
-	@echo "🛡️ Connecting to Sentinel to check quorum..."
-	@$(DOCKER) exec -it k8s-toolbox bash -c 'POD=$$(kubectl get pods -n data -l "app.kubernetes.io/name=redis,app.kubernetes.io/component=sentinel" -o jsonpath="{.items[0].metadata.name}"); kubectl exec -it $$POD -n data -- redis-cli -p 26379 info sentinel'
+bounce: ## 🔄 Interactive menu to safely restart a deployment
+	@echo "============================================="
+	@echo "    🔄 EQUITY TRADING APP - BOUNCER"
+	@echo "============================================="
+	@PS3="Select an app to safely rollout restart (or type a number to exit): "; \
+	select app in $(BOUNCE_BANK) "Exit"; do \
+		if [ "$$app" = "Exit" ]; then echo "Gracefully exiting bouncer."; break; fi; \
+		if [ -n "$$app" ]; then \
+			ns=$$(case $$app in \
+				locust) echo "load-testing";; \
+				streamlit) echo "frontend";; \
+				adminer|poolers) echo "data";; \
+				*) echo "backend";; \
+			esac); \
+			if [ "$$app" = "poolers" ]; then \
+				echo "♻️ Bouncing both Read-Write and Read-Only poolers..."; \
+				$(DOCKER) exec k8s-toolbox kubectl rollout restart deployment/trading-pooler -n data; \
+				$(DOCKER) exec k8s-toolbox kubectl rollout restart deployment/trading-pooler-ro -n data; \
+			elif [ "$$app" = "fastapi" ]; then \
+				echo "♻️ Bouncing fastapi-api in backend..."; \
+				$(DOCKER) exec k8s-toolbox kubectl rollout restart deployment/fastapi-api -n backend; \
+			else \
+				echo "♻️ Bouncing $$app in $$ns..."; \
+				$(DOCKER) exec k8s-toolbox kubectl rollout restart deployment/$$app -n $$ns; \
+			fi; \
+			break; \
+		fi; \
+	done

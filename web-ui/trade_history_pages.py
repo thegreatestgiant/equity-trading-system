@@ -1,5 +1,5 @@
 import streamlit as st
-
+import datetime
 from api_client import (
     get_trades,
     get_trades_by_account,
@@ -50,15 +50,18 @@ def _render_trades_table(result):
 
 @st.fragment(run_every="6s")
 def _all_trades_fragment():
-    result = get_trades()
+    account_id = st.session_state.get("trades_account_filter")
+    ticker = st.session_state.get("trades_ticker_filter")
+    time_start = st.session_state.get("trades_date_from_filter")
+    time_end = st.session_state.get("trades_date_to_filter")
+    result = get_trades(account_id=account_id, ticker=ticker, time_start=time_start, time_end=time_end)
     if result["status"] != "success":
         st.error(result["message"])
         return
-
     rows = flatten_trades(result["data"])
     render_trades_grid(
         rows,
-        empty_message="No trades yet. Book one to see history here.",
+        empty_message="No trades found.",
         key="all_trades_grid",
     )
 
@@ -66,6 +69,26 @@ def _all_trades_fragment():
 def render_all_trades_page():
     st.header("📜 Trade History")
     st.caption("GET /trades")
+    col1, col2 = st.columns(2)
+    with col1:
+        account_id = account_select(label="Account (optional)", key="trades_page_filter_account")
+    with col2:
+        ticker = st.text_input("Ticker (optional)", key="trades_page_filter_ticker").strip().upper() or None
+    col3, col4 = st.columns(2)
+    with col3:
+        date_from = st.date_input("From", value=datetime.date.today() - datetime.timedelta(days=30),
+                                  key="trades_page_filter_from")
+    with col4:
+        date_to = st.date_input("To (optional)", value=None, key="trades_page_filter_to")
+    time_start = date_from.isoformat() if date_from else None
+    time_end = date_to.isoformat() if date_to else None
+    st.session_state["trades_account_filter"] = account_id
+    st.session_state["trades_ticker_filter"] = ticker
+    st.session_state["trades_date_from_filter"] = time_start
+    st.session_state["trades_date_to_filter"] = time_end
+    if not account_id and not ticker and not time_start and not time_end:
+        st.info("Select an account, enter a ticker, or pick a date range to load trades.")
+        return
     _all_trades_fragment()
 
 

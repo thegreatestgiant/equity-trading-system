@@ -6,8 +6,8 @@ CREATE TABLE trades (
     user_id UUID, -- users
     direction trade_direction,
     symbol_ticker TEXT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ,
     quantity INT,
     price NUMERIC,
     other_account UUID -- accounts
@@ -30,8 +30,10 @@ CREATE TABLE positions (
     account_id UUID, -- accounts
     symbol_ticker TEXT,
     quantity INT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    average_cost NUMERIC,
+    total_realized_gains NUMERIC,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE TABLE accounts (
@@ -39,8 +41,8 @@ CREATE TABLE accounts (
     account_name TEXT,
     positions UUID[], -- positions
     can_short BOOLEAN,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE TABLE users (
@@ -48,8 +50,13 @@ CREATE TABLE users (
     username TEXT,
     oauth_key TEXT,
     accounts_associated UUID[], -- accounts
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE username (
+    username TEXT PRIMARY KEY,
+    user_id  UUID -- users
 );
 
 -- STAGING TABLES (ignore)
@@ -59,8 +66,10 @@ CREATE UNLOGGED TABLE positions_sync_stage (
     account_id UUID, -- accounts
     symbol_ticker TEXT,
     quantity INT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    average_cost NUMERIC,
+    total_realized_gains NUMERIC,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE UNLOGGED TABLE accounts_sync_stage (
@@ -68,8 +77,8 @@ CREATE UNLOGGED TABLE accounts_sync_stage (
     account_name TEXT,
     positions UUID[], -- positions
     can_short BOOLEAN,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE UNLOGGED TABLE users_sync_stage (
@@ -77,8 +86,13 @@ CREATE UNLOGGED TABLE users_sync_stage (
     username TEXT,
     oauth_key TEXT,
     accounts_associated UUID[], -- accounts
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+
+CREATE UNLOGGED TABLE username_sync_stage (
+    username TEXT PRIMARY KEY,
+    user_id  UUID -- users
 );
 
 -- Ensure trade_admin has full access (CNPG does not make the app user a superuser)

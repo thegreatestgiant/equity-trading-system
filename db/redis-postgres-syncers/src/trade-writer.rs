@@ -25,11 +25,9 @@ const RECLAIM_INTERVAL: Duration = Duration::from_secs(10);
 
 // PRE-ALLOCATED QUERY STRINGS
 
-/// COPY fresh messages straight into `trades` table
-const DIRECT_COPY_QUERY: &str = "COPY trades (trade_id, account_id, user_id, direction, symbol_ticker, created_at, updated_at, quantity, price, other_account) FROM STDIN WITH (FORMAT text, DELIMITER '\t', NULL '\\N')";
-
-/// create temp staging table, private to this connection and dropped on commit.
-/// concurrent workers running this statement won't clash
+/// create temp staging table.
+/// concurrent workers running this statement won't clash, because the temp
+/// table is private to each connection and dropped on commit
 const CREATE_STAGE_QUERY: &str =
     "CREATE TEMP TABLE trades_stage (LIKE trades INCLUDING DEFAULTS) ON COMMIT DROP";
 
@@ -92,13 +90,13 @@ async fn run() -> Result<()> {
     // buffer to hold bulk COPY data. Pre-allocating ~500KB to avoid reallocations
     let mut copy_payload_buffer = String::with_capacity(512_000);
 
-    // opts to fetch new messages (">") in batches from the configured redis stream
+    // redis will wait for either BATCH_COUNT messages or 100ms, whichever is first
     let opts = StreamReadOptions::default()
         .group(&consumer_group, &worker_name)
-        // redis will wait for either BATCH_COUNT messages or 100ms, whichever is first
         .count(BATCH_COUNT)
         .block(100);
 
+    // new messages
     let new_message_id: [&str; 1] = [">"];
 
     // (needs to be assigned because of lifetime witchcraft in the select macro)
@@ -120,12 +118,7 @@ async fn run() -> Result<()> {
         // Select between waiting for Redis stream entries or a shutdown signal:
         let reply: StreamReadReply = tokio::select! {
             res = redis_conn.xread_options(&stream_name_arr, &new_message_id, &opts) => {
-                match res {
-                    Ok(r) => r,
-                    Err(e) => {
-                        helpers::fatal("Redis stream read failed", e).await
-                    }
-                }
+                res.context("Redis stream read failed")?
             }
             () = helpers::shutdown_signal() => {
                 info!("Shutdown signal received");
@@ -143,7 +136,6 @@ async fn run() -> Result<()> {
                 &consumer_group,
                 &mut copy_payload_buffer,
                 ids,
-                false,
             )
             .await;
         }
@@ -214,7 +206,6 @@ async fn reclaim_abandoned(
                 consumer_group,
                 copy_payload_buffer,
                 reply.claimed,
-                true,
             )
             .await;
         }
@@ -229,10 +220,6 @@ async fn reclaim_abandoned(
 
 /// Decode a batch of stream entries, write them to postgres, and ACK+trim them
 /// in redis on success.
-///
-/// `use_staging` selects the write strategy: reclaimed messages may be
-/// duplicates, so they go through a staging table + upsert that updates on
-/// conflict, while fresh messages take the faster direct COPY path.
 async fn process_batch(
     pg_client: &mut tokio_postgres::Client,
     redis_conn: &mut redis::aio::MultiplexedConnection,
@@ -240,7 +227,6 @@ async fn process_batch(
     consumer_group: &str,
     copy_payload_buffer: &mut String,
     ids: Vec<StreamId>,
-    use_staging: bool,
 ) {
     let msg_ids = build_payload_buffer(copy_payload_buffer, &ids);
     if msg_ids.is_empty() {
@@ -253,18 +239,15 @@ async fn process_batch(
             "Decoded no valid rows, ACK+trimming {} bad messages to discard them.",
             msg_ids.len()
         );
-        if let Err(err) = ack_and_trim_stream(redis_conn, stream_name, consumer_group, &msg_ids).await
+        if let Err(err) =
+            ack_and_trim_stream(redis_conn, stream_name, consumer_group, &msg_ids).await
         {
             error!(?err, "Failed to ACK and trim bad messages in Redis");
         }
         return;
     }
 
-    let write_result = if use_staging {
-        copy_via_staging(pg_client, copy_payload_buffer).await
-    } else {
-        copy_direct(pg_client, copy_payload_buffer).await
-    };
+    let write_result = copy_via_staging(pg_client, copy_payload_buffer).await;
 
     // xack and trim messages in redis ONLY after postgres confirms the write.
     match write_result {
@@ -287,36 +270,10 @@ async fn process_batch(
     }
 }
 
-/// COPY the payload buffer straight into `trades` table.
-///
-/// Used for fresh messages, which are not expected to collide. Returns `Err`
-/// on failure so the caller knows not to ACK.
-async fn copy_direct(
-    pg_client: &tokio_postgres::Client,
-    copy_payload_buffer: &str,
-) -> Result<()> {
-    let sink = pg_client
-        .copy_in(DIRECT_COPY_QUERY)
-        .await
-        .map_err(helpers::pg_error)
-        .context("Failed to initialize postgres COPY sink")?;
-
-    // Send the entire batch over the network in one chunk
-    helpers::send_copy_payload(sink, copy_payload_buffer)
-        .await
-        .map_err(helpers::pg_error)
-        .context("COPY failed, transaction aborted")?;
-
-    Ok(())
-}
-
 /// COPY the payload buffer into a transient per-transaction staging table, then
 /// upsert into `trades`.
 ///
-/// Because the staging table is `TEMP ... ON COMMIT DROP`,
-/// it is private to this connection and cannot clash with other workers running
-/// the same statement concurrently. The upsert makes reprocessing a message
-/// idempotent instead of aborting the whole batch on a primary-key conflict.
+/// updates on primary-key conflict instead of crashing
 async fn copy_via_staging(
     pg_client: &mut tokio_postgres::Client,
     copy_payload_buffer: &str,
@@ -326,7 +283,7 @@ async fn copy_via_staging(
         .transaction()
         .await
         .map_err(helpers::pg_error)
-        .context("Failed to open db transaction (for staging)")?;
+        .context("Failed to open db transaction")?;
 
     tx.batch_execute(CREATE_STAGE_QUERY)
         .await
@@ -355,7 +312,7 @@ async fn copy_via_staging(
     tx.commit()
         .await
         .map_err(helpers::pg_error)
-        .context("Committing staging transaction failed")?;
+        .context("Failed to commit postgres transaction")?;
 
     Ok(())
 }

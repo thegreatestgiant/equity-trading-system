@@ -3,3 +3,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../../base/data-layer
+
+patches:
+  - path: redis-state-patch.yaml # This is what you named your file

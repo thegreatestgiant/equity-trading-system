@@ -19,3 +19,12 @@ patches:
             server:
               global:
                 scrape_interval: 15s
+  # - target:
+  #     kind: HelmRelease
+  #     name: "^(cnpg|keda)$"
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/dependsOn
+  #       value:
+  #         - name: loki-stack
+  #           namespace: monitoring

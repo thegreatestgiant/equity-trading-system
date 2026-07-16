@@ -15,4 +15,5 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "argon2-cffi>=25.1.0",
     "logbook>=1.9.2",
+    "psutil>=7.2.2",
 ]

@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-
 from account_picker import get_account_name
 
 def _trade_row(trade):
@@ -44,8 +43,6 @@ def render_trades_grid(rows, empty_message="No trades found.", key="trades_grid"
     if not rows:
         st.info(empty_message)
         return
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-    from st_aggrid.shared import JsCode
 
     df = pd.DataFrame(rows)
 
@@ -54,6 +51,8 @@ def render_trades_grid(rows, empty_message="No trades found.", key="trades_grid"
     if "Booked At" in df.columns:
         df["Booked At"] = pd.to_datetime(df["Booked At"], errors="coerce")
 
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    from st_aggrid.shared import JsCode
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(sortable=True, filter=True, resizable=True)
     gb.configure_pagination(paginationAutoPageSize=True)
@@ -90,6 +89,7 @@ def render_trades_grid(rows, empty_message="No trades found.", key="trades_grid"
             "browserDatePicker": True,
         },
     )
+    gb.configure_grid_options(enableCellTextSelection=True, ensureDomOrder=True)
 
     grid_options = gb.build()
 

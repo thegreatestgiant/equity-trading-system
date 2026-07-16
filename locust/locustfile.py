@@ -45,21 +45,24 @@ class EquityTradingUser(HttpUser):
             raise Exception("Failed to register after 3 attempts")
 
         response = self.client.post(
-            "/users/account", params={"account_name": "Trading", "can_short": True}
+            "/users/account",
+            params={"account_name": "Trading", "can_short": True},
         )
 
         if response.status_code == 200:
             self.account_ids.append(response.json()["account_id"])
 
         response = self.client.post(
-            "/users/account", params={"account_name": "Econ", "can_short": True}
+            "/users/account",
+            params={"account_name": "Econ", "can_short": True},
         )
 
         if response.status_code == 200:
             self.account_ids.append(response.json()["account_id"])
 
         response = self.client.post(
-            "/users/account", params={"account_name": "Retirement", "can_short": True}
+            "/users/account",
+            params={"account_name": "Retirement", "can_short": True},
         )
 
         if response.status_code == 200:

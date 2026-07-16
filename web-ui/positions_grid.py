@@ -76,12 +76,14 @@ def render_positions_grid(rows, empty_message="No positions found.", key="positi
     if not rows:
         st.info(empty_message)
         return
+    df = pd.DataFrame(rows)
+
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
-    df = pd.DataFrame(rows)
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(sortable=True, filter=True, resizable=True)
     gb.configure_pagination(paginationAutoPageSize=True)
+    gb.configure_grid_options(enableCellTextSelection=True, ensureDomOrder=True)
     grid_options = gb.build()
 
     AgGrid(

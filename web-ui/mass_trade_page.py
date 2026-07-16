@@ -1,7 +1,8 @@
 import streamlit as st
+import concurrent.futures
 import pandas as pd
-
-from api_client import submit_trades
+import requests
+from api_client import submit_trades, API_BASE_URL
 from account_picker import get_account_options
 
 EXPECTED_FIELDS = 5  # name, ticker, direction, quantity, price
@@ -110,14 +111,13 @@ def _parse_input(raw_text: str) -> list[dict]:
 
 
 def _render_preview_grid(rows: list[dict]):
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
-
     """Renders parsed trades as an AgGrid with green/red row coloring
     based on validity."""
     df = pd.DataFrame(rows)
 
     # Drop internal columns before display
     display_df = df.drop(columns=["_valid", "_account_id"])
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(sortable=True, resizable=True)
@@ -134,7 +134,7 @@ def _render_preview_grid(rows: list[dict]):
         }
     """)
 
-    gb.configure_grid_options(getRowStyle=row_style)
+    gb.configure_grid_options(getRowStyle=row_style, enableCellTextSelection=True, ensureDomOrder=True)
     grid_options = gb.build()
 
     AgGrid(
@@ -145,6 +145,50 @@ def _render_preview_grid(rows: list[dict]):
         allow_unsafe_jscode=True,
         key="mass_trade_preview_grid",
     )
+
+
+def _submit_chunk_with_cookie(chunk, cookie):
+    session = requests.Session()
+    if cookie:
+        session.cookies.set("session", cookie)
+    try:
+        response = session.post(f"{API_BASE_URL}/trade", json=chunk)
+    except Exception:
+        return {"status": "error", "message": "Could not reach the backend."}
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    return {"status": "error", "message": response.text}
+
+
+BATCH_SIZE = 25
+
+
+def _submit_in_batches(payload):
+    cookie = st.session_state.get("saved_session_cookie")
+
+    chunks = []
+    for i in range(0, len(payload), BATCH_SIZE):
+        chunks.append(payload[i:i + BATCH_SIZE])
+
+    all_successes = []
+    all_failures = []
+    errors = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(_submit_chunk_with_cookie, chunk, cookie) for chunk in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result["status"] == "success":
+                data = result["data"]
+                all_successes.extend(data.get("successes", []))
+                all_failures.extend(data.get("failures", []))
+            else:
+                errors.append(result["message"])
+
+    if errors and not all_successes and not all_failures:
+        return {"status": "error", "message": "; ".join(errors)}
+
+    return {"status": "success", "data": {"successes": all_successes, "failures": all_failures}}
 
 
 def _reset_mass_trade_state():
@@ -322,7 +366,10 @@ def render_mass_trade_page():
             for r in valid_rows
         ]
 
-        result = submit_trades(payload)
+        n_batches = (len(payload) + BATCH_SIZE - 1) // BATCH_SIZE
+        with st.spinner(f"Submitting {len(payload)} trades across {n_batches} parallel batches…"):
+            result = _submit_in_batches(payload)
+
 
         if result["status"] == "success":
             st.session_state.mass_trade_submitted = True

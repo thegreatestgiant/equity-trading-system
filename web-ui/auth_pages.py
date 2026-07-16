@@ -55,6 +55,9 @@ def render_register_page():
                 # Same defensive clear as render_login_page() -- see there.
                 st.session_state.clear()
                 st.session_state.username = username
+                st.session_state.saved_session_cookie = login_result["session_cookie"]
+                st.query_params["remember_user"] = username
+                st.query_params["remember_session"] = login_result["session_cookie"]
                 remember_login(username, login_result["session_cookie"])
                 st.success(f"Account created for {result['username']}. Logging you in...")
                 st.rerun()

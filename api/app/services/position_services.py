@@ -317,7 +317,11 @@ async def edit_position(
     try:
         # Acquire every lock
         for lock in locks:
-            await lock.acquire()
+            acquired = await lock.acquire()
+            if not acquired:
+                raise HTTPException(
+                    status_code=409, detail="Could not acquire required locks."
+                )
             acquired_locks.append(lock)
 
         writes = []
@@ -348,6 +352,7 @@ async def edit_position(
             new_trade,
             trade_id,
             datetime.now(timezone.utc),
+            existing_trade["created_at"],
             other_account,
             user_id,
         )
@@ -359,7 +364,10 @@ async def edit_position(
     finally:
         # Always release, even if something throws
         for lock in reversed(acquired_locks):
-            await lock.release()
+            try:
+                await lock.release()
+            except Exception:
+                logger.error("Failed to release Redis lock")
 
 
 async def update_position_data(

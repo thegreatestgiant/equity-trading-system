@@ -4,13 +4,16 @@ kind: Kustomization
 
 resources:
   - ../../../base/apps
-  # - streamlit-tailscale.yaml
+  - streamlit-tailscale.yaml
+  - streamlit-traefik.yaml
+  - traefik-proxy.yaml
 
 patches:
   - path: ingress-overwrite.yaml
   - patch: |-
-      apiVersion: traefik.io/v1alpha1
-      kind: Middleware
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
       metadata:
-        name: streamlit-fallback
+        name: streamlit-ingress
       $patch: delete
+

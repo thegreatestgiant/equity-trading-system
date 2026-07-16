@@ -187,11 +187,11 @@ async def update_trade(
     )  # Ensure this account_id exists in the database
     existing_trade_dict = dict(existing_trade)
 
-    await verify_trade_details(trade.model_dump(), user_data)  # Validate trade details
-
     trade.other_account = verify_other_account(
         trade.other_account
     )  # Validate other_account
+
+    await verify_trade_details(trade.model_dump(), user_data)  # Validate trade details
 
     await edit_position(
         user_id, existing_trade_dict, trade.model_dump(), trade.other_account, trade_id

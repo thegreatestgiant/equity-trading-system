@@ -22,3 +22,12 @@ patches:
         values:
           prometheus:
             enabled: false
+  # - target:
+  #     kind: HelmRelease
+  #     name: "^(cnpg|keda)$"
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/dependsOn
+  #       value:
+  #         - name: loki-stack
+  #           namespace: monitoring

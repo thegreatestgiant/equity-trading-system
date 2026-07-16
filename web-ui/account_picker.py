@@ -1,11 +1,27 @@
+import time
+
 import streamlit as st
 
 from api_client import get_user_accounts
 
+_ACCOUNTS_CACHE_TTL_SECONDS = 10
+
 
 def get_account_options():
     """Returns (labels, label_to_id) built from the logged-in user's real
-    accounts. Backend returns {"accounts": {name: account_id, ...}}."""
+    accounts. Backend returns {"accounts": {name: account_id, ...}}.
+
+    Cached in session_state for a few seconds. get_account_name() below
+    calls this once per row, so rendering a grid/list of N trades or
+    positions used to fire N sequential HTTP requests to the backend just
+    to resolve account names -- this collapses that to one real fetch per
+    TTL window. Deliberately session_state (per browser session), not
+    st.cache_data (shared across all sessions), so one user's accounts
+    can never leak into another user's cache."""
+    cached = st.session_state.get("_account_options_cache")
+    if cached and time.time() - cached["fetched_at"] < _ACCOUNTS_CACHE_TTL_SECONDS:
+        return cached["labels"], cached["label_to_id"]
+
     result = get_user_accounts()
     accounts = {}
     if result["status"] == "success":
@@ -14,7 +30,21 @@ def get_account_options():
         f"{name or '(unnamed account)'} — {account_id}": account_id
         for name, account_id in accounts.items()
     }
-    return list(label_to_id.keys()), label_to_id
+    labels = list(label_to_id.keys())
+
+    st.session_state["_account_options_cache"] = {
+        "labels": labels,
+        "label_to_id": label_to_id,
+        "fetched_at": time.time(),
+    }
+    return labels, label_to_id
+
+
+def _invalidate_account_options_cache():
+    """Call after any mutation that changes the account list/names
+    (create/update account) so the next lookup doesn't serve stale data
+    for up to _ACCOUNTS_CACHE_TTL_SECONDS."""
+    st.session_state.pop("_account_options_cache", None)
 
 
 def get_account_name(account_id):

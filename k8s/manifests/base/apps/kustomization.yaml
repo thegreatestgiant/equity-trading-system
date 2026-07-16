@@ -14,6 +14,10 @@ images:
     newName: ghcr.io/sm26-industrial-software-dev/web-ui:latest
   - name: price-cacher-image
     newName: ghcr.io/sm26-industrial-software-dev/price-cacher:latest
+  - name: redis-populator-image
+    newName: ghcr.io/sm26-industrial-software-dev/redis-populator:latest
+  # - name: price-timeseries-cacher-image
+  #   newName: ghcr.io/sm26-industrial-software-dev/price-timeseries-cacher:latest
 
 resources:
   - error-pages
@@ -23,7 +27,10 @@ resources:
   - trade-writer
   - db-syncer
   - adminer
+  - redisinsight
   - price-cacher
+  - redis-populator
+  # - price-timeseries-cacher
 
 configMapGenerator:
   - name: db-routing

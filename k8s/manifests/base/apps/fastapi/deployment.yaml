@@ -16,35 +16,39 @@ spec:
         app: fastapi
     spec:
       initContainers:
-        - name: wait-for-db
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for PgBouncer/Postgres to become reachable..."
-              until nc -z trading-pooler.data.svc.cluster.local 5432 && \
-                    nc -z redis-proxy.data.svc.cluster.local 6379; do
-                echo "Database or Redis not ready. Sleeping 2 seconds..."
-                sleep 2
-              done
-              echo "Database/Redis is online! Proceeding with FastAPI startup."
-        - name: wait-for-tickers
+        - name: wait-for-dependencies
           image: redis:8-alpine
           command:
             - sh
             - -c
             - |
-              until [ "$(redis-cli -h redis-proxy.data.svc.cluster.local HLEN market_prices)" -gt "0" ]; do
-                echo "Waiting for price-cacher to populate market_prices..."
-                sleep 2
+              echo "Waiting for PgBouncer/Postgres and Redis market_prices..."
+              until nc -z trading-pooler.data.svc.cluster.local 5432 && \
+                    [ "$(redis-cli -h redis-proxy.data.svc.cluster.local HLEN market_prices 2>/dev/null)" -gt "0" ] 2>/dev/null; do
+                echo "Dependencies not ready. Sleeping 5 seconds..."
+                sleep 5
               done
+              echo "Dependencies ready! Proceeding with FastAPI startup."
       containers:
         - name: fastapi
           image: api-image
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /probe
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /probe
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
           envFrom:
             - secretRef:
                 name: db-credentials

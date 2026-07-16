@@ -119,11 +119,11 @@ restore-all: ## 🚑 Resume Flux to naturally restore all chaos components
 	@echo "📦 Forcing HelmRelease reconciliations (to restore Redis/StatefulSets)..."
 	@$(DOCKER) exec k8s-toolbox flux reconcile helmrelease -n data --all 2>/dev/null || true
 
-chaos-node-stop: ## 🔥 Stopping the primary K3s node (Simulating Server Crash)
+chaos-node-stop: ## 🔥 Stop the primary K3s node (simulates a server crash)
 	@echo "🔥 Stopping the primary K3s node (Simulating Server Crash)..."
 	@$(DOCKER) exec k8s-toolbox k3d node stop k3d-dev-cluster-server-0
 
-chaos-node-start: ## 🚑 Rebooting the primary K3s node
+chaos-node-start: ## 🚑 Reboot the primary K3s node
 	@echo "🚑 Rebooting the primary K3s node..."
 	@$(DOCKER) exec k8s-toolbox k3d node start k3d-dev-cluster-server-0
 

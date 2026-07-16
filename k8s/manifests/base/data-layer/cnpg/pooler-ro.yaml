@@ -18,12 +18,14 @@ spec:
       containers: []
       initContainers:
         - name: wait-for-replica
-          image: busybox:1.36
+          image: busybox:latest
           command:
             - sh
             - -c
             - |
+              echo "Waiting for PostgreSQL Replica to become reachable before starting PgBouncer pooler..."
               until nc -z trading-db-ro.data.svc.cluster.local 5432; do
-                echo "No ready replica yet. Sleeping 2 seconds..."
-                sleep 2
+                echo "Postgres not ready. Sleeping 5 seconds..."
+                sleep 5
               done
+              echo "Postgres is online! Proceeding with PgBouncer startup."

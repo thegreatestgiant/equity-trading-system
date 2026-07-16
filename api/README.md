@@ -1,27 +1,19 @@
-FastAPI for booking trades
-- Uses redis and Postgres for database retrieval
+FastAPI backend for booking and querying trades. Reads Postgres for trade history, Reads/Writes Redis for fast data, and authenticates requests via a session cookie.
 
-Current Features:
-- Register
-- Login
-- Logout
-- New Account
-- Pair User to existing Account
-- Get all of a user's accounts 
-- Get User positions
-- - All positions
-- - All positions for 1 account
-- - All positions for a specific ticker
-- - Position for specific account and specific ticker
-- Book a trade
-- Get Trade data
-- - All trade data
-- - All trade data for account
-- - All trade data for ticker
-- - Trade data for specific account and specific ticker
-- - All of above for a specific time range
-- - One specific trade data
+### Components (`app/`)
+- `routers/` — `auth`, `accounts`, `positions`, `trades`, `health`: the API surface.
+- `services/` — business logic behind each router (account/position/trade services, S&P ticker validation).
+- `models/` — Pydantic request/response models.
+- `core/` — Postgres pool, Redis client, config, security (cookie auth), logging, event_monitoring (logging various test only data).
+- `middleware/` — request logging and timings.
 
-All of these also verify your cookie and write to redis and read from postgres as appopriate
+### Endpoints
+- **Auth**: `POST /register`, `POST /login`, `POST /logout`
+- **Accounts**: `POST /users/account`, `POST /users/add_account/{account_id}`, `PATCH /users/update_account_details/{account_id}`, `GET /users/allaccounts`
+- **Positions**: `GET /positions`, `GET /positions/accounts/{account_id}`, `GET /positions/ticker/{ticker}`, `GET /positions/accounts/{account_id}/ticker/{ticker}`
+- **Trades**: `GET /tickers`, `POST /trade` (single or batch), `GET /trades`, `GET /trade/{trade_id}`, `PATCH /edit_trade/{trade_id}`
+- **Health**: `GET /probe`
 
-The api is dependent on a postgres, redis, and the logging system to be up first in order for it to run.
+All routes except auth verify the session cookie. Positions, Accounts, and Users are written to Redis for fast acces ad for the `db-syncer` to then update Postgres. Trades are written to a Redis stream for the `trade-writer` workers to pick up (see [`db/redis-postgres-syncers/README.md`](../db/redis-postgres-syncers/README.md)).
+
+Requires Postgres, Redis, Redis to be loaded with the S&P tickers, and the logging stack to be up before it will start.

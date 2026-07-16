@@ -4,9 +4,11 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.database import create_pool
 from app.core.redis import redis_client
 from app.core.logging import logger
+# from app.core.event_loop_monitor import monitor_loop
 from app.services import ticker_service
 from app.middleware.logging_middleware import logging_middleware
 import time
+# import asyncio
 import logbook.compat
 
 from app.routers import (
@@ -58,6 +60,8 @@ async def lifespan(app: FastAPI):
         logger.error("No valid tickers found after 5 attempts")
         raise Exception("No valid tickers found after 5 attempts")
 
+    # asyncio.create_task(monitor_loop())
+
     yield
 
     await app.state.pg_pool.close()
@@ -68,7 +72,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+Instrumentator(should_instrument_requests_inprogress=True).instrument(app).expose(
+    app, endpoint="/metrics"
+)
 
 app.include_router(auth.router)
 app.include_router(accounts.router)

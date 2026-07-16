@@ -104,15 +104,23 @@ def _render_positions_result(result, empty_message="No positions found.", accoun
 
 @st.fragment(run_every="6s")
 def _all_positions_fragment():
-    result = get_all_positions()
+    account_id = st.session_state.get("positions_account_filter")
+    ticker = st.session_state.get("positions_ticker_filter")
+    if not account_id and not ticker:
+        return
+    if account_id and ticker:
+        result = get_positions_by_account_and_ticker(account_id, ticker)
+    elif account_id:
+        result = get_positions_by_account(account_id)
+    else:
+        result = get_positions_by_ticker(ticker)
     if result["status"] != "success":
         st.error(result["message"])
         return
-
     rows = flatten_positions(result["data"])
     render_positions_grid(
         rows,
-        empty_message="No positions yet. Book a trade to see positions here.",
+        empty_message="No positions found.",
         key="all_positions_grid",
     )
 
@@ -120,8 +128,17 @@ def _all_positions_fragment():
 def render_all_positions_page():
     st.header("📊 All Positions")
     st.caption("GET /positions")
+    col1, col2 = st.columns(2)
+    with col1:
+        account_id = account_select(label="Account (optional)", key="pos_page_filter_account")
+    with col2:
+        ticker = st.text_input("Ticker (optional)", key="pos_page_filter_ticker").strip().upper() or None
+    st.session_state["positions_account_filter"] = account_id
+    st.session_state["positions_ticker_filter"] = ticker
+    if not account_id and not ticker:
+        st.info("Select an account or enter a ticker to load positions.")
+        return
     _all_positions_fragment()
-
 
 @st.fragment(run_every="15s")
 def _positions_by_account_fragment(account_id):

@@ -17,6 +17,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: streamlit-svc # Point directly to the app
+                name: traefik-proxy # Point to our double-proxy bridge
                 port:
                   number: 80

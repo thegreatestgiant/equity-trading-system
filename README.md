@@ -1,20 +1,22 @@
 # Equity Trading System
 
-Welcome to the heart of our operations! This repository contains the entire infrastructure and application stack for our high-frequency Equity Trading System.
+A containerized, Kubernetes-native high-frequency equity trading system: a FastAPI backend, a Streamlit UI, and Rust workers syncing Redis and Postgres.
 
 ### The Stack
-We run a modern, containerized stack designed for speed and reliability:
-* **API**: FastAPI (Python) with `uv` package management.
-* **UI**: Streamlit (Python) for rapid data visualization.
-* **Workers**: Rust-based syncers (`db-syncer`, `trade-writer`, `redis-populator`) for ultra-fast data handling.
-* **Data Layer**: Redis for ingestion, PostgreSQL for persistence, and PgBouncer for connection pooling.
-* **Infrastructure**: Kubernetes (k3d), Flux for GitOps, and the Loki-stack for observability.
+* **API**: FastAPI (Python) with `uv` package management. See [`api/README.md`](api/README.md).
+* **UI**: Streamlit (Python) with AG Grid tables for mass trading and data visualization. See [`web-ui/README.md`](web-ui/README.md).
+* **Workers**: Rust syncers (`db-syncer`, `trade-writer`, `price-cacher`, `price-timeseries-cacher`, `redis-populator`) moving data between Redis and Postgres. See [`db/redis-postgres-syncers/README.md`](db/redis-postgres-syncers/README.md).
+* **Data Layer**: Redis with Redis Sentinel (HA, fast ingestion), PostgreSQL via CloudNativePG (HA persistence), PgBouncer for connection pooling, Adminer and RedisInsight for DB inspection.
+* **Autoscaling & Ingress**: KEDA for event-driven autoscaling, Traefik for ingress, Reloader for dynamic config updates.
+* **Testing**: Locust for distributed load testing. See [`locust/README.md`](locust/README.md).
+* **Infrastructure**: Kubernetes (k3d for local dev, K3s for distributed remote), Flux for GitOps, Loki/Grafana for observability. See [`k8s/README.md`](k8s/README.md).
 
 ### Getting Started
-Ready to jump in? Check out our [DEVELOPERS.md](DEVELOPERS.md) for a deep dive into how to set up your environment, manage overlays, and debug the cluster.
+See [DEVELOPERS.md](DEVELOPERS.md) to set up your environment, manage overlays, and debug the cluster.
 
 #### K3S Manager option
 You can clone our k3s manager here 
 ```sh 
 curl -sSL "https://raw.githubusercontent.com/SM26-Industrial-Software-Dev/equity-trading-system/main/k3s_manager.sh" -o k3s_manager.sh && chmod +x k3s_manager.sh
 ```
+

@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redisinsight
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redisinsight
+  template:
+    metadata:
+      labels:
+        app: redisinsight
+    spec:
+      containers:
+        - name: redisinsight
+          image: redis/redisinsight:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5540
+          env:
+            # Skip the EULA prompt so the UI is usable immediately.
+            - name: RI_ACCEPT_TERMS_AND_CONDITIONS
+              value: "true"
+            # Pre-add the cluster's Redis connection (via the HAProxy master proxy).
+            # This is the RedisInsight analog of Adminer's autologin. Auth is
+            # disabled on the Redis HelmRelease, so no username/password is needed.
+            - name: RI_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_HOST
+            - name: RI_REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: redis-config
+                  key: REDIS_PORT
+            - name: RI_REDIS_ALIAS
+              value: trading-redis
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "512Mi"

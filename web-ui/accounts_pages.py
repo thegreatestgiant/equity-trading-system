@@ -1,7 +1,7 @@
 import streamlit as st
 
 from api_client import create_account, get_user_accounts, update_user_account
-from account_picker import account_select
+from account_picker import account_select, _invalidate_account_options_cache
 
 
 @st.fragment(run_every="15s")
@@ -37,6 +37,7 @@ def _accounts_list_fragment():
 
 def render_my_accounts_page():
     st.header("🏦 My Accounts")
+    st.warning("TEST MARKER — latest version as of 12:37 PM 7/14 (remove before ship)")
     _accounts_list_fragment()
 
 
@@ -44,12 +45,15 @@ def render_create_account_page():
     st.header("➕ Open a New Account")
     st.caption("POST /users/account")
 
-    name = st.text_input("Account Name", placeholder="e.g. Retirement, Trading")
-    can_short = st.checkbox("Can Short")
+    with st.form("create_account_form"):
+        name = st.text_input("Account Name", placeholder="e.g. Retirement, Trading")
+        can_short = st.checkbox("Can Short")
+        submitted = st.form_submit_button("Create Account")
 
-    if st.button("Create Account"):
+    if submitted:
         result = create_account(name, can_short)
         if result["status"] == "success":
+            _invalidate_account_options_cache()
             account_id = result.get("account_id")
             display_name = result.get("name") or name or "(unnamed account)"
             if account_id:
@@ -78,6 +82,7 @@ def render_update_account_page():
                 can_short=can_short,
             )
             if result["status"] == "success":
+                _invalidate_account_options_cache()
                 st.success("Account updated successfully.")
             else:
                 st.error(result["message"])
