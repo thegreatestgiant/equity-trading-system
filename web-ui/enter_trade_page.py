@@ -103,11 +103,45 @@ def _render_post_submission_state():
     _render_submission_results(successes, failures)
 
     st.divider()
-    if st.button("➕ Book More Trades", type="primary"):
-        st.session_state.last_submission_result = None
-        st.session_state.reviewing = False
-        st.session_state.editing_trade_index = None
-        st.rerun()
+    with st.container(key="enter_trade_success_buttons"):
+        st.markdown(
+            """
+            <style>
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(1) button {
+                background-color: #28a745; border-color: #28a745; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(1) button:hover {
+                background-color: #218838; border-color: #1e7e34;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(2) button {
+                background-color: #007bff; border-color: #007bff; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(2) button:hover {
+                background-color: #0069d9; border-color: #0062cc;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(3) button {
+                background-color: #6f42c1; border-color: #6f42c1; color: white; width: 100%;
+            }
+            .st-key-enter_trade_success_buttons div[data-testid="column"]:nth-child(3) button:hover {
+                background-color: #5a32a3; border-color: #542c98;
+            }
+            </style>
+            """, unsafe_allow_html=True
+        )
+        col1, col2, col3, _ = st.columns([1.5, 1.5, 1.5, 7.5])
+        if col1.button("➕ Book More Trades"):
+            st.session_state.last_submission_result = None
+            st.session_state.reviewing = False
+            st.session_state.editing_trade_index = None
+            st.rerun()
+        if col2.button("📊 View Positions"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_account = payload[0]["account_id"]
+            st.switch_page("pages/positions.py")
+        if col3.button("💸 View Trades"):
+            if payload and payload[0].get("account_id"):
+                st.session_state.jump_to_trades_account = payload[0]["account_id"]
+            st.switch_page("pages/trade_history.py")
 
 
 def _render_submission_results(successes, failures):
@@ -124,7 +158,11 @@ def _render_submission_results(successes, failures):
         with st.container(border=True):
             st.markdown("✅ **Trade booked**")
             if trade_id:
-                st.caption(f"Trade ID: `{trade_id}`")
+                col_tid, col_edit = st.columns([10, 1])
+                col_tid.caption(f"Trade ID: `{trade_id}`")
+                if col_edit.button("✏️", key=f"edit_booked_{trade_id}", help="Edit Trade"):
+                    st.session_state.editing_trade_id = trade_id
+                    st.switch_page("pages/edit_trade.py")
 
     for entry in failures:
         reason = (
