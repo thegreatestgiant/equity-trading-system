@@ -70,6 +70,7 @@ install_control_plane() {
           --server https://${JOIN_IP}:6443 \
           --node-ip=${TAILSCALE_IP} \
           --flannel-iface=tailscale0 \
+          --flannel-backend=host-gw \
           --bind-address=${TAILSCALE_IP} \
           --advertise-address=${TAILSCALE_IP} \
           --tls-san=${TAILSCALE_IP}" sh -s -
@@ -79,6 +80,7 @@ install_control_plane() {
           --cluster-init \
           --node-ip=${TAILSCALE_IP} \
           --flannel-iface=tailscale0 \
+          --flannel-backend=host-gw \
           --bind-address=${TAILSCALE_IP} \
           --advertise-address=${TAILSCALE_IP} \
           --tls-san=${TAILSCALE_IP}" sh -s -

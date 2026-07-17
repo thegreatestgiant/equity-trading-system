@@ -25,6 +25,15 @@ def _position_row(position, account_id=None):
     if total_value is None and price is not None and quantity is not None:
         total_value = price * quantity
 
+    avg_cost = position.get("average_cost")
+    unrealized = position.get("unrealized_pnl")
+    realized = position.get("realized_pnl")
+    total_pnl = (
+        round(unrealized + realized, 2)
+        if unrealized is not None and realized is not None
+        else None
+    )
+
     return {
         "Account": get_account_name(account_id) if account_id else "—",
         "Account ID": account_id or "—",
@@ -32,6 +41,10 @@ def _position_row(position, account_id=None):
         "Quantity": quantity,
         "Price/Share": round(price, 2) if price is not None else None,
         "Total Value": round(total_value, 2) if total_value is not None else None,
+        "Avg Cost": round(avg_cost, 2) if avg_cost is not None else None,
+        "Unrealized P&L": round(unrealized, 2) if unrealized is not None else None,
+        "Realized P&L": round(realized, 2) if realized is not None else None,
+        "Total P&L": total_pnl,
         "Updated": _format_timestamp(position.get("updated_at")),
     }
 

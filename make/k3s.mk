@@ -2,6 +2,7 @@
 
 all: help
 
+SHELL := /bin/bash
 BOUNCE_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher poolers
 
 help: ## Show this dynamic help menu
