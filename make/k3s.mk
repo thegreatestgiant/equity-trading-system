@@ -1,8 +1,51 @@
-.PHONY: status events ks sync logs db-backup db-restore db-clear
+.PHONY: all help status events ks sync logs db-backup db-restore db-clear bounce st-status st-restart st-scale
+
+all: help
+
+BOUNCE_BANK = fastapi streamlit locust adminer db-syncer trade-writer price-cacher poolers
+
+help: ## Show this dynamic help menu
+	@echo "=========================================================="
+	@echo "🚀 EQUITY TRADING SYSTEM - K3S MENU"
+	@echo "=========================================================="
+	@echo "Usage: make [target]"
+	@echo ""
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+	awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+bounce: ## 🔄 Interactive menu to safely restart a deployment
+	@echo "============================================="
+	@echo "    🔄 EQUITY TRADING APP - BOUNCER"
+	@echo "============================================="
+	@PS3="Select an app to safely rollout restart (or type a number to exit): "; \
+	select app in $(BOUNCE_BANK) "Exit"; do \
+		if [ "$$app" = "Exit" ]; then echo "Gracefully exiting bouncer."; break; fi; \
+		if [ -n "$$app" ]; then \
+			ns=$$(case $$app in \
+				locust) echo "load-testing";; \
+				streamlit) echo "frontend";; \
+				adminer|poolers) echo "data";; \
+				*) echo "backend";; \
+			esac); \
+			if [ "$$app" = "poolers" ]; then \
+				echo "♻️ Bouncing both Read-Write and Read-Only poolers..."; \
+				kubectl rollout restart deployment/trading-pooler -n data; \
+				kubectl rollout restart deployment/trading-pooler-ro -n data; \
+			elif [ "$$app" = "fastapi" ]; then \
+				echo "♻️ Bouncing fastapi-api in backend..."; \
+				kubectl rollout restart deployment/fastapi-api -n backend; \
+			else \
+				echo "♻️ Bouncing $$app in $$ns..."; \
+				kubectl rollout restart deployment/$$app -n $$ns; \
+			fi; \
+			break; \
+		fi; \
+	done
 
 # ===============================================
 # 🚀 K3S CONTROL PANEL (DEBIAN) SPECIFIC COMMANDS
 # ===============================================
+
 
 status: ## 🟢 CURRENT POD STATUS (K3s):
 	@echo "🟢 CURRENT POD STATUS (K3s):"
@@ -17,7 +60,7 @@ ks: ## Verify all sync stages are Ready (K3s)
 
 sync: ## Force Flux to reconcile (K3s)
 	@echo "🔄 Forcing Flux to synchronize Git..."
-	@flux reconcile source git equity-trading-system -n flux-system
+	@flux reconcile source git flux-system -n flux-system
 	@echo "🔄 Syncing Kustomizations..."
 	@flux reconcile kustomization 1-infra --with-source || true
 	@flux reconcile kustomization 2-data --with-source || true
@@ -142,3 +185,23 @@ db-clear: ## ⚠️ WIPE the entire trading database (Destructive) (K3s)
 		echo "Aborted."; \
 		;; \
 	esac
+
+# ==========================================
+# 📊 STREAMLIT HELPER COMMANDS (K3s)
+# ==========================================
+
+st-status: ## 👀 View Streamlit pods (K3s)
+	@echo "📊 STREAMLIT PODS:"
+	@kubectl get pods -n frontend -l app=streamlit
+
+st-restart: ## ♻️ Restart Streamlit deployment (repull image if tag changed/Always) (K3s)
+	@echo "♻️ Restarting Streamlit deployment..."
+	@kubectl rollout restart deployment/streamlit -n frontend
+
+st-scale: ## ⚖️ Scale Streamlit deployment (usage: make st-scale REPLICAS=3) (K3s)
+	@if [ -z "$(REPLICAS)" ]; then \
+		echo "❌ Please specify REPLICAS. Example: make st-scale REPLICAS=3"; \
+	else \
+		echo "⚖️ Scaling Streamlit to $(REPLICAS) replicas..."; \
+		kubectl scale deployment/streamlit -n frontend --replicas=$(REPLICAS); \
+	fi

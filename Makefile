@@ -6,14 +6,14 @@ HOST_ROOT := $(shell pwd)
 export HOST_ROOT
 
 # Include all of our modular Make targets
+include make/chaos.mk
 include make/cluster.mk
-include make/status.mk
-include make/shell.mk
 include make/db.mk
 include make/debug.mk
-include make/chaos.mk
-include make/logs.mk
 include make/images.mk
+include make/logs.mk
+include make/shell.mk
+include make/status.mk
 
 # ==========================================
 # 🆘 HELP MENU
