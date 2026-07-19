@@ -164,10 +164,10 @@ async def get_all_accounts_positions(account_id: str, user_id: str):
             "latest_price": market["latest_price"],
             "open_price": market["open_price"],
             "position_value": x_positions["quantity"] * market["latest_price"],
-            "average_cost": position["average_cost"],
-            "realized_pnl": position["total_realized_gains"],
-            "unrealized_pnl": (market["latest_price"] - position["average_cost"])
-            * position["quantity"],
+            "average_cost": x_positions["average_cost"],
+            "realized_pnl": x_positions["total_realized_gains"],
+            "unrealized_pnl": (market["latest_price"] - x_positions["average_cost"])
+            * x_positions["quantity"],
             "created_at": x_positions["created_at"],
             "updated_at": x_positions["updated_at"],
         }

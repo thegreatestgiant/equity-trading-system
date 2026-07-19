@@ -117,10 +117,23 @@ async def get_all_users_accounts(user_id: str):
         )
     user_data = json.loads(raw_user)
 
-    account_name = []
-    for account in user_data["accounts_associated"]:
-        account_raw = await redis_client.hget(redis_dictionaries[1], account)
-        accont_real = json.loads(account_raw)
-        account_name.append(accont_real["account_name"])
+    pipe = redis_client.pipeline()
 
-    return dict(zip(account_name, user_data["accounts_associated"]))
+    for account_id in user_data["accounts_associated"]:
+        pipe.hget(redis_dictionaries[1], account_id)
+
+    results = await pipe.execute()
+
+    accounts = []
+
+    for account_id, raw_account in zip(user_data["accounts_associated"], results):
+        account_real = json.loads(raw_account)
+        accounts.append(
+            {
+                "account_id": account_id,
+                "account_name": account_real["account_name"],
+                "can_short": account_real["can_short"],
+            }
+        )
+
+    return accounts
