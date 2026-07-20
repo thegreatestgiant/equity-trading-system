@@ -13,7 +13,7 @@ router = APIRouter(tags=["Positions"])
 
 @router.get("/positions")
 async def get_users_positions(user_id: str = Depends(verify_cookie)):
-    logger.info("Recieved request to get all of a user's positions")
+    logger.info("Received request to get all of a user's positions")
 
     positions = await get_all_users_positions(user_id)
 
@@ -24,7 +24,7 @@ async def get_users_positions(user_id: str = Depends(verify_cookie)):
 async def get_accounts_positions(
     account_id: str, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved request for all of an account's positions")
+    logger.info("Received request for all of an account's positions")
 
     positions = await get_all_accounts_positions(account_id, user_id)
 
@@ -35,7 +35,7 @@ async def get_accounts_positions(
 async def get_users_positions_for_ticker(
     ticker: str, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved request for user's positions for a ticker")
+    logger.info("Received request for user's positions for a ticker")
 
     positions = await get_all_users_ticker_positions(ticker, user_id)
 
@@ -46,7 +46,7 @@ async def get_users_positions_for_ticker(
 async def get_accounts_positions_for_ticker(
     ticker: str, account_id: str, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved request for an account's position by ticker")
+    logger.info("Received request for an account's position by ticker")
 
     positions = await get_account_ticker_position(ticker, account_id, user_id)
 

@@ -2,7 +2,7 @@ from fastapi import HTTPException
 import uuid
 import json
 from datetime import datetime, timezone
-from app.core.redis import redis_client, redis_dictionaries
+from app.core.redis import redis_client, USERS_KEY, ACCOUNTS_KEY, POSITIONS_KEY, MARKET_PRICES_KEY
 from app.core.logging import logger
 from app.core.config import TRADE_STREAM
 from app.services.trade_services import create_payload
@@ -10,7 +10,7 @@ from app.services.trade_services import create_payload
 
 async def get_all_users_positions(user_id: str):
     # Get User data to check their accounts
-    raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
+    raw_user = await redis_client.hget(USERS_KEY, user_id)
     if raw_user is None:
         raise HTTPException(
             status_code=503, detail="The database has crashed, try again later"
@@ -23,7 +23,7 @@ async def get_all_users_positions(user_id: str):
     users_accounts = set(user_data["accounts_associated"])
 
     for account in users_accounts:
-        pipe.hget(redis_dictionaries[1], account)
+        pipe.hget(ACCOUNTS_KEY, account)
 
     accounts = await pipe.execute()
 
@@ -40,7 +40,7 @@ async def get_all_users_positions(user_id: str):
         for position_uuid in account_data["positions"]:
             position_uuid_to_account_name[position_uuid] = account_data["account_name"]
             position_uuid_keys.append(position_uuid)
-            pipe.hget(redis_dictionaries[2], position_uuid)
+            pipe.hget(POSITIONS_KEY, position_uuid)
 
     results = await pipe.execute()
 
@@ -60,7 +60,7 @@ async def get_all_users_positions(user_id: str):
         if ticker not in seen_symbols:
             all_symbols_for_positions.append(ticker)
             seen_symbols.add(ticker)
-            pipe.hget(redis_dictionaries[4], ticker)
+            pipe.hget(MARKET_PRICES_KEY, ticker)
 
     # Gathering market data for each ticker
     results = await pipe.execute()
@@ -104,7 +104,7 @@ async def get_all_users_positions(user_id: str):
 
 async def get_all_accounts_positions(account_id: str, user_id: str):
     # Get User data
-    raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
+    raw_user = await redis_client.hget(USERS_KEY, user_id)
     if raw_user is None:
         raise HTTPException(
             status_code=503, detail="The database has crashed, try again later"
@@ -113,12 +113,12 @@ async def get_all_accounts_positions(account_id: str, user_id: str):
 
     # Confirm it's your account
     if account_id not in user_data["accounts_associated"]:
-        logger.warning("Attempt to access account that the user does now own")
+        logger.warning("Attempt to access account that the user does not own")
         raise HTTPException(
             status_code=401, detail="You do not have access to this account"
         )
 
-    raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
+    raw_account = await redis_client.hget(ACCOUNTS_KEY, account_id)
     account_data = json.loads(raw_account)
 
     positions = {}
@@ -126,7 +126,7 @@ async def get_all_accounts_positions(account_id: str, user_id: str):
     pipe = redis_client.pipeline()
 
     for position_uuid in account_data["positions"]:
-        pipe.hget(redis_dictionaries[2], position_uuid)
+        pipe.hget(POSITIONS_KEY, position_uuid)
 
     results = await pipe.execute()
 
@@ -144,7 +144,7 @@ async def get_all_accounts_positions(account_id: str, user_id: str):
         if ticker not in seen_symbols:
             all_symbols_for_positions.append(ticker)
             seen_symbols.add(ticker)
-            pipe.hget(redis_dictionaries[4], ticker)
+            pipe.hget(MARKET_PRICES_KEY, ticker)
 
     results = await pipe.execute()
 
@@ -175,15 +175,18 @@ async def get_all_accounts_positions(account_id: str, user_id: str):
 
 
 async def get_all_users_ticker_positions(ticker: str, user_id: str):
-    # Get User data
-    raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
+    # Get User and ticker data in one round trip
+    pipe = redis_client.pipeline()
+    pipe.hget(USERS_KEY, user_id)
+    pipe.hget(MARKET_PRICES_KEY, ticker)
+    raw_user, raw_symbol_data = await pipe.execute()
+
     if raw_user is None:
         raise HTTPException(
             status_code=503, detail="The database has crashed, try again later"
         )
     user_data = json.loads(raw_user)
 
-    raw_symbol_data = await redis_client.hget(redis_dictionaries[4], ticker)
     if raw_symbol_data is None:
         raise HTTPException(status_code=422, detail="Ticker does not exist")
     real_symbol_data = json.loads(raw_symbol_data)
@@ -193,7 +196,7 @@ async def get_all_users_ticker_positions(ticker: str, user_id: str):
     users_accounts = set(user_data["accounts_associated"])
 
     for account in users_accounts:
-        pipe.hget(redis_dictionaries[1], account)
+        pipe.hget(ACCOUNTS_KEY, account)
 
     accounts = await pipe.execute()
     pipe = redis_client.pipeline()
@@ -206,7 +209,7 @@ async def get_all_users_ticker_positions(ticker: str, user_id: str):
         for position_uuid in account_data["positions"]:
             position_uuid_set[position_uuid] = account_data["account_name"]
             position_uuid_keys.append(position_uuid)
-            pipe.hget(redis_dictionaries[2], position_uuid)
+            pipe.hget(POSITIONS_KEY, position_uuid)
 
     results = await pipe.execute()
 
@@ -243,8 +246,13 @@ async def get_all_users_ticker_positions(ticker: str, user_id: str):
 
 
 async def get_account_ticker_position(ticker: str, account_id: str, user_id: str):
-    # Grab User data
-    raw_user = await redis_client.hget(redis_dictionaries[0], user_id)
+    # Grab User, ticker, and account data in one round trip
+    pipe = redis_client.pipeline()
+    pipe.hget(USERS_KEY, user_id)
+    pipe.hget(MARKET_PRICES_KEY, ticker)
+    pipe.hget(ACCOUNTS_KEY, account_id)
+    raw_user, raw_symbol_data, raw_account = await pipe.execute()
+
     if raw_user is None:
         raise HTTPException(
             status_code=503, detail="The database has crashed, try again later"
@@ -257,12 +265,10 @@ async def get_account_ticker_position(ticker: str, account_id: str, user_id: str
             status_code=401, detail="You do not have access to this account"
         )
 
-    raw_symbol_data = await redis_client.hget(redis_dictionaries[4], ticker)
     if raw_symbol_data is None:
         raise HTTPException(status_code=422, detail="Ticker does not exist")
     real_symbol_data = json.loads(raw_symbol_data)
 
-    raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
     account_data = json.loads(raw_account)
 
     positions = {}
@@ -270,7 +276,7 @@ async def get_account_ticker_position(ticker: str, account_id: str, user_id: str
     pipe = redis_client.pipeline()
 
     for position_uuid in account_data["positions"]:
-        pipe.hget(redis_dictionaries[2], position_uuid)
+        pipe.hget(POSITIONS_KEY, position_uuid)
 
     results = await pipe.execute()
 
@@ -397,13 +403,13 @@ async def update_position_data(
     quantity_delta: int,
 ):
 
-    raw_account = await redis_client.hget(redis_dictionaries[1], account_id)
+    raw_account = await redis_client.hget(ACCOUNTS_KEY, account_id)
     account_data = json.loads(raw_account)
 
     pipe = redis_client.pipeline()
 
     for position_uuid in account_data["positions"]:
-        pipe.hget(redis_dictionaries[2], position_uuid)
+        pipe.hget(POSITIONS_KEY, position_uuid)
 
     results = await pipe.execute()
 
@@ -422,7 +428,7 @@ async def update_position_data(
             x_positions["updated_at"] = now
             return [
                 {
-                    "dictionary": redis_dictionaries[2],
+                    "dictionary": POSITIONS_KEY,
                     "key": position_uuid,
                     "value": json.dumps(x_positions),
                 }
@@ -448,12 +454,12 @@ async def update_position_data(
 
     return [
         {
-            "dictionary": redis_dictionaries[2],
+            "dictionary": POSITIONS_KEY,
             "key": position_key,
             "value": json.dumps(position_data),
         },
         {
-            "dictionary": redis_dictionaries[1],
+            "dictionary": ACCOUNTS_KEY,
             "key": account_id,
             "value": json.dumps(account_data),
         },

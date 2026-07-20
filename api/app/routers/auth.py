@@ -14,7 +14,7 @@ router = APIRouter(tags=["Login"])
 
 @router.post("/register")
 async def register_user(request: RegisterRequest, response: Response):
-    logger.info("Recieved new user request")
+    logger.info("Received new user request")
 
     user_id = await register_valid_user(
         username=request.username, password=request.password
@@ -35,7 +35,7 @@ async def register_user(request: RegisterRequest, response: Response):
 
 @router.post("/login")
 async def login_user(request: LoginRequest, response: Response):
-    logger.info("Recieved new login request")
+    logger.info("Received new login request")
 
     id = await login_valid_user(username=request.username, password=request.password)
 
@@ -49,12 +49,12 @@ async def login_user(request: LoginRequest, response: Response):
         max_age=DAY_IN_SEC,
     )
 
-    return {"message": "login succesful."}
+    return {"message": "login successful."}
 
 
 @router.post("/logout")
 async def logout(response: Response, request: Request):
-    logger.info("Recieved new logout request")
+    logger.info("Received new logout request")
     cookie = request.cookies.get("session")
 
     if cookie:

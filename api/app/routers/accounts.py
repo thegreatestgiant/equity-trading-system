@@ -16,7 +16,7 @@ router = APIRouter(tags=["Accounts"])
 async def create_account(
     account_name: str, can_short: bool, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved new account request")
+    logger.info("Received new account request")
 
     account_id = await create_new_account(account_name, can_short, user_id)
 
@@ -27,7 +27,7 @@ async def create_account(
 async def add_account(
     account_id: str, other_user: str, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved new account sync to user request")
+    logger.info("Received new account sync to user request")
 
     await add_account_to_user(account_id, other_user, user_id)
 
@@ -38,7 +38,7 @@ async def add_account(
 async def change_short_perms(
     account_id: str, request: Details, user_id: str = Depends(verify_cookie)
 ):
-    logger.info("Recieved new short change request")
+    logger.info("Received new short change request")
 
     details = await change_account_short_perms(
         account_id,
@@ -53,7 +53,7 @@ async def change_short_perms(
 
 @router.get("/users/allaccounts")
 async def get_all_accounts(user_id: str = Depends(verify_cookie)):
-    logger.info("Recieved new get all user's accounts request")
+    logger.info("Received new get all user's accounts request")
 
     account_details = await get_all_users_accounts(user_id)
 

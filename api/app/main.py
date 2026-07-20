@@ -4,11 +4,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.database import create_pool
 from app.core.redis import redis_client
 from app.core.logging import logger
-# from app.core.event_loop_monitor import monitor_loop
 from app.services import ticker_service
 from app.middleware.logging_middleware import logging_middleware
-import time
-# import asyncio
+import asyncio
 import logbook.compat
 
 from app.routers import (
@@ -52,15 +50,13 @@ async def lifespan(app: FastAPI):
         if len(ticker_service.valid_tickers) == 0:
             logger.warning("No valid tickers found, retrying in 5 seconds")
             start += 1
-            time.sleep(5)
+            await asyncio.sleep(5)
         else:
             logger.info("Loaded S&P Tickers")
             break
     if len(ticker_service.valid_tickers) == 0:
         logger.error("No valid tickers found after 5 attempts")
         raise Exception("No valid tickers found after 5 attempts")
-
-    # asyncio.create_task(monitor_loop())
 
     yield
 

@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from datetime import datetime, timezone
 import json
 import uuid
-from app.core.redis import redis_client, redis_dictionaries
+from app.core.redis import redis_client, USERS_KEY, USERNAMES_KEY
 from app.core.security import pwd_context
 from app.core.logging import logger
 from app.core.config import DAY_IN_SEC
@@ -10,7 +10,7 @@ from app.core.config import DAY_IN_SEC
 
 async def register_valid_user(username: str, password: str):
     # Check if the username already exists in Redis
-    old_uuid = await redis_client.hget(redis_dictionaries[3], username)
+    old_uuid = await redis_client.hget(USERNAMES_KEY, username)
 
     if old_uuid:
         logger.warning("Pre-existing username was used")
@@ -27,16 +27,18 @@ async def register_valid_user(username: str, password: str):
         "created_at": now,
         "updated_at": now,
     }
-    # send new User to redis
-    await redis_client.hset(redis_dictionaries[0], user_id, json.dumps(user_data))
-    await redis_client.hset(redis_dictionaries[3], username, user_id)
+    # send new User to redis (both writes atomically so neither can land alone)
+    pipe = redis_client.pipeline(transaction=True)
+    pipe.hset(USERS_KEY, user_id, json.dumps(user_data))
+    pipe.hset(USERNAMES_KEY, username, user_id)
+    await pipe.execute()
 
     return user_id
 
 
 async def login_valid_user(username: str, password: str):
     # Get the User data from redis
-    old_uuid = await redis_client.hget(redis_dictionaries[3], username)
+    old_uuid = await redis_client.hget(USERNAMES_KEY, username)
 
     if not old_uuid:
         logger.warning("Invalid login attempt")
@@ -44,7 +46,7 @@ async def login_valid_user(username: str, password: str):
 
     old_uuid = old_uuid.decode() if isinstance(old_uuid, bytes) else old_uuid
 
-    raw_user_data = await redis_client.hget(redis_dictionaries[0], old_uuid)
+    raw_user_data = await redis_client.hget(USERS_KEY, old_uuid)
     if raw_user_data is None:
         raise HTTPException(
             status_code=503, detail="The database has crashed, try again later"

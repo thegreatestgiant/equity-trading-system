@@ -28,7 +28,7 @@ async def get_tickers(user_id: str = Depends(verify_cookie)):
 
 @router.post("/trade")
 async def create_trade(trade: list[Trade], user_id: str = Depends(verify_cookie)):
-    logger.info("Recieved request to book trade data")
+    logger.info("Received request to book trade data")
 
     if len(trade) == 0:  # Didn't send any trade data
         logger.warning("There was no trade data")
