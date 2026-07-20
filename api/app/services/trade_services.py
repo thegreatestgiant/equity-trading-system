@@ -260,6 +260,10 @@ async def get_account_data(account_id: str) -> dict:
     return json.loads(raw_account)
 
 
+def verify_other_account(other_account: str | None) -> str | None:
+    return other_account
+
+
 def calculate_p_and_l_changes(trade: dict, specific_position: dict, new_position: int):
     qty = specific_position["quantity"]
     avg = specific_position["average_cost"]

@@ -8,3 +8,17 @@ resources:
 
 patches:
   - path: monitoring-ingress-overwrite.yaml
+  - target:
+      kind: Deployment
+      name: cnpg-system-cnpg-cloudnative-pg
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: doesnt-matter
+      spec:
+        template:
+          spec:
+            dnsConfig:
+              options:
+                - name: use-vc

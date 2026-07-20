@@ -25,12 +25,19 @@ pub async fn fatal(message: &str, err: impl std::fmt::Debug) -> ! {
 }
 
 /// Open a multiplexed async redis connection, or log the error and exit.
+///
+/// Disables the default response timeout that redis-rs 1.x introduced,
+/// which causes spurious "timed out" errors over Tailscale VPN links.
 pub async fn connect_redis(url: String) -> redis::aio::MultiplexedConnection {
     let client = match redis::Client::open(url) {
         Ok(client) => client,
         Err(e) => fatal("failed to open redis client", e).await,
     };
-    match client.get_multiplexed_async_connection().await {
+    let config = redis::AsyncConnectionConfig::new().set_response_timeout(None);
+    match client
+        .get_multiplexed_async_connection_with_config(&config)
+        .await
+    {
         Ok(conn) => {
             debug!("connected to redis");
             conn
@@ -87,7 +94,7 @@ pub fn init_tracing(app_name: &str) -> Result<()> {
     tracing_subscriber::registry()
         .with(LevelFilter::DEBUG)
         .with(loki_layer)
-        // .with(tracing_subscriber::fmt::layer().with_writer(std::io::stdout))
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stdout))
         .init();
 
     tokio::spawn(loki_task);

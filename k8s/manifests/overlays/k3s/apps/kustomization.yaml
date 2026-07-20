@@ -16,3 +16,17 @@ patches:
       metadata:
         name: streamlit-ingress
       $patch: delete
+  - target:
+      kind: Deployment
+      name: fastapi-api|trade-writer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: doesnt-matter
+      spec:
+        template:
+          spec:
+            dnsConfig:
+              options:
+                - name: use-vc

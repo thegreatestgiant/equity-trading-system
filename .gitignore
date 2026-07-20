@@ -8,3 +8,5 @@ GEMINI.md
 
 # Database Backups
 *.dump
+
+scratch/*
