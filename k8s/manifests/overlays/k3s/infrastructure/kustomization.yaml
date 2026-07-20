@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - ../../../base/infrastructure
   - tailscale
+  - tailscale-route-fix.yaml
 
 patches:
   - path: monitoring-ingress-overwrite.yaml

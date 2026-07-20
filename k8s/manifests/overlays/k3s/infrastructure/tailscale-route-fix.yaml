@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tailscale-route-fix
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: tailscale-route-fix
+  template:
+    metadata:
+      labels:
+        name: tailscale-route-fix
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists # Run on all nodes, including control plane
+      containers:
+        - name: route-fix
+          image: alpine:latest
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                ip route add 100.64.0.0/10 dev tailscale0 2>/dev/null || true
+                sleep 60
+              done

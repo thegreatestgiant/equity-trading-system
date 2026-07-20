@@ -4,16 +4,16 @@ FROM alpine:3.19
 RUN apk add --no-cache curl bash docker-cli openssl
 
 # Install kubectl
-RUN curl -LO "https://dl.k8s.io/release/v1.36.2/bin/linux/amd64/kubectl" \
+RUN curl -LO --fail "https://dl.k8s.io/release/v1.36.2/bin/linux/amd64/kubectl" \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
 
 # Install k3d
-RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | \
+RUN curl -s --fail https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | \
     TAG=v5.9.0 bash
 
 # Install Helm
-RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+RUN curl -fsSL --fail -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     && chmod 700 get_helm.sh \
     && DESIRED_VERSION=v4.2.2 ./get_helm.sh \
     && rm get_helm.sh
