@@ -34,3 +34,18 @@ clean-images: ## Aggressively clean docker host images and k3d image cache
 	-$(DOCKER) exec k3d-dev-cluster-agent-1 crictl rmi --prune
 	-$(DOCKER) exec k3d-dev-cluster-server-0 crictl rmi --prune
 	@echo "✅ Done!"
+
+# ==========================================
+# 🌍 CROSS-COMPILE & PUSH (PROD/ORG REPO)
+# ==========================================
+
+push-ui: ## Cross-compile (amd64/arm64) and push UI to org repo (e.g. make push-ui REPO=org/web-ui TAG=v1.0.0)
+	@if [ -z "$(REPO)" ] || [ -z "$(TAG)" ]; then \
+		echo "❌ Error: REPO and TAG are required."; \
+		echo "💡 Usage: make push-ui REPO=myorg/web-ui TAG=v1.0.0"; \
+		exit 1; \
+	fi
+	@echo "🚀 Cross-compiling and pushing UI to $(REPO):$(TAG)..."
+	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(TAG) --push ./web-ui
+	@echo "✅ Done!"
+
